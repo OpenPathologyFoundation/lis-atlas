@@ -1,3 +1,4 @@
 node_modules/
 docs/.observable/
 .DS_Store
+.dev-notes/
