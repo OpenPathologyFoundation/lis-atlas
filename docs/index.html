@@ -189,7 +189,7 @@
   <script type="text/markdown">
     ## The data
 
-    Every response the atlas shows, as a searchable table. ${publicView ? "Labs that asked not to be named appear as their type and location, and " + fmtCount(filtered.filter((d) => !listable(d)).length) + " labs that chose totals only aren't listed. Switching plans show only where the lab says they're announced or under contract; elsewhere the plan columns read \u201c—\u201d." : "Staff view: every response, with names, consent levels, and whether plans are public."}
+    Every response the atlas shows, as a searchable table. ${publicView ? "Labs that asked not to be named appear as their type and location, and " + fmtCount(filtered.filter((d) => !listable(d)).length) + " labs that chose totals only aren't listed. Switching plans show only where the lab says they're announced or under contract; elsewhere the plan columns read “—”." : "Staff view: every response, with names, consent levels, and whether plans are public."}
   </script>
   <script type="module">
     Inputs.table(filtered.filter(listable).map((d) => ({
