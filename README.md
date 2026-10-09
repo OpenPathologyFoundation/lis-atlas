@@ -12,10 +12,11 @@ An open, crowdsourced world map of which laboratory information system (LIS) eve
 - **Who runs what:** world map of the most common LIS per country, small maps of where each major vendor is strongest, and the installed base, filterable by discipline (AP, CP, microbiology, blood bank), region, and institution type.
 - **Who's switching:** a Sankey from current LIS to new LIS, plus the main reasons for switching and who drives the decision.
 - **Upcoming go-lives:** one dot per lab by quarter through 2030, and vendor share over time projected from scheduled go-lives.
+- **Where labs are headed:** whether labs plan to keep a traditional LIS, add digital pathology tools, or move to digital-first workflow orchestration, and how that tracks with the size of their in-house informatics team.
 - **Six degrees of the survey:** the referral network from the Association board outward; hover a lab to trace its chain.
 - **Coverage:** countries with no responses yet, ranked by population, as the call to action for regional ambassadors.
 - **Rollout:** responses and countries over time across the pilot, LinkedIn wave, and ambassador phases.
-- **Privacy rules:** each lab picks a consent level in the survey (named, unnamed, or totals only), and the public view hides anything based on fewer than 5 labs. Switching plans are listed only once a lab says they're announced or under contract; "evaluating" only counts in totals. A **Show as** switch compares the public view with the raw staff view.
+- **Privacy rules:** each lab picks a consent level in the survey (named, unnamed, or totals only), and the public view hides anything based on fewer than 5 labs. Switching plans are listed only once a lab says they're announced or under contract; "evaluating," long-term direction, and informatics team size only count in totals. A **Show as** switch compares the public view with the raw staff view.
 - **Survey (demo):** the 2–3 minute survey. Submitting adds your lab to every chart in the page for that browser session; nothing is sent anywhere.
 
 ## The notebook

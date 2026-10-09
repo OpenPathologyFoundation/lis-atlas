@@ -139,6 +139,22 @@
     shareOverTime(filtered, discipline.key)
   </script>
   <script type="text/markdown">
+    <a id="atlas-direction"></a>
+
+    ## Where labs are headed
+
+    Switching vendors is one question. Whether a lab needs a traditional LIS at all is another. Every lab says where it is headed and how many informatics staff it has in house. ${fmtCount(summary.digitalFirst)} labs (${pctOf(summary.digitalFirst, summary.n)}) already run primary digital or plan to move to digital-first workflow orchestration. These two answers are only ever counted in totals.
+  </script>
+  <script type="module">
+    html`<div>
+      <p><b>Long-term direction</b></p>
+      ${breakdownChart(filtered, "direction", "Direction", DIRECTIONS)}
+      <p style="margin-top: 1.5rem"><b>Digital-first labs by in-house informatics team</b></p>
+      ${digitalByTeamChart(filtered)}
+      <p class="viz-note">Share of labs in each group that already run primary digital or plan to move to digital-first workflow orchestration.</p>
+    </div>`
+  </script>
+  <script type="text/markdown">
     <a id="atlas-network"></a>
 
     ## Six degrees of the survey
@@ -212,7 +228,7 @@
       Reason: planShown(d) ? d.reason ?? "" : "—",
       "Decided by": planShown(d) ? d.decider ?? "" : "—",
       Hops: d.degree,
-      ...(publicView ? {} : {Consent: CONSENT_LABELS[d.consent], "Plans public": d.newVendor ? (d.plansPublic ? "Yes" : "Not yet") : ""})
+      ...(publicView ? {} : {Consent: CONSENT_LABELS[d.consent], "Plans public": d.newVendor ? (d.plansPublic ? "Yes" : "Not yet") : "", Direction: d.direction, "Informatics team": d.informatics})
     })), {rows: 14, layout: "auto"})
   </script>
   <script type="text/markdown">
@@ -225,7 +241,7 @@
     - **Named** (${d3.format(",")(consentCounts.get("named") ?? 0)} labs): name shown with systems and announced plans.
     - **Unnamed** (${d3.format(",")(consentCounts.get("unnamed") ?? 0)} labs): systems and plans shown as, say, "a community hospital in Germany". Where a country has fewer than ${MIN_CELL} responding labs, only the region is given.
     - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} labs): counted in maps, charts, and totals, but never listed individually.
-    - **Plans:** a listed lab's new vendor, go-live date, reason, and decision-maker appear only once the lab says they're announced or under contract. "Evaluating" is only ever counted in totals.
+    - **Plans:** a listed lab's new vendor, go-live date, reason, and decision-maker appear only once the lab says they're announced or under contract. "Evaluating" is only ever counted in totals, and so are each lab's long-term direction and informatics team size.
     - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} labs is hidden. Map areas are hatched, and counts read "fewer than ${MIN_CELL}". ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
 
     Switch **Show as** to *Staff view* at the top of the page to see the raw data these rules protect. In the live atlas, that view would sit behind a staff login.
@@ -279,6 +295,9 @@
     const CONSOLIDATION_REASONS = ["Enterprise EHR consolidation", "Health-system merger or acquisition"];
     const DECIDERS = ["Lab or pathology leadership", "Joint lab and IT committee", "Health-system IT or executives", "Followed the EHR decision", "Parent organization after a merger"];
     const LAB_AT_TABLE = ["Lab or pathology leadership", "Joint lab and IT committee"];
+    const DIRECTIONS = ["Keep a traditional LIS", "LIS plus digital pathology add-ons", "Move to digital-first orchestration", "Already primary digital", "Undecided"];
+    const DIGITAL_FIRST = ["Move to digital-first orchestration", "Already primary digital"];
+    const INFORMATICS_TEAMS = ["None", "1–2 people", "3–10 people", "More than 10"];
     const REGIONS = ["North America", "Europe", "Middle East", "Asia-Pacific", "Latin America", "Africa"];
     const REGION_EXTENT = {
       "North America": [[-168, 14], [-52, 72]],
@@ -488,6 +507,20 @@
       "Health-system merger or acquisition": {"Parent organization after a merger": 58, "Health-system IT or executives": 30, "Joint lab and IT committee": 12},
       other: {"Lab or pathology leadership": 42, "Joint lab and IT committee": 36, "Health-system IT or executives": 22}
     };
+    const TEAM_MIX = {
+      "Academic medical center": {"None": 3, "1–2 people": 17, "3–10 people": 50, "More than 10": 30},
+      "Community hospital": {"None": 35, "1–2 people": 45, "3–10 people": 17, "More than 10": 3},
+      "Reference / commercial lab": {"None": 5, "1–2 people": 20, "3–10 people": 40, "More than 10": 35},
+      "Public health lab": {"None": 30, "1–2 people": 45, "3–10 people": 22, "More than 10": 3},
+      "Independent pathology practice": {"None": 40, "1–2 people": 40, "3–10 people": 17, "More than 10": 3}
+    };
+    // Bigger informatics teams lean toward digital-first.
+    const DIRECTION_MIX = {
+      "None": {"Keep a traditional LIS": 48, "LIS plus digital pathology add-ons": 27, "Move to digital-first orchestration": 3, "Already primary digital": 1, "Undecided": 21},
+      "1–2 people": {"Keep a traditional LIS": 36, "LIS plus digital pathology add-ons": 38, "Move to digital-first orchestration": 7, "Already primary digital": 2, "Undecided": 17},
+      "3–10 people": {"Keep a traditional LIS": 24, "LIS plus digital pathology add-ons": 44, "Move to digital-first orchestration": 14, "Already primary digital": 6, "Undecided": 12},
+      "More than 10": {"Keep a traditional LIS": 16, "LIS plus digital pathology add-ons": 42, "Move to digital-first orchestration": 22, "Already primary digital": 11, "Undecided": 9}
+    };
     const REASONS_OTHER = {"Vendor end-of-life / sunset": 25, "Digital pathology & AI readiness": 19, "Total cost of ownership": 17, "Usability & workflow": 15, "Regulatory & interoperability": 12, "Health-system merger or acquisition": 8, "Enterprise EHR consolidation": 4};
     const BOARD_QUOTA = {"840": 8, "124": 2, "826": 2, "276": 1, "528": 1, "036": 1, "724": 1, "682": 1, "250": 1};
     const REACH = {us: "core", ca: "core", uk: "core", dach: "core", south: "core", nordic: "core", anz: "core", gulf: "mid", east: "mid", za: "mid", eastasia: "far", southasia: "far", latam: "far", africa: "far"};
@@ -529,6 +562,8 @@
       const consentRandom = d3.randomLcg(1729);
       const announceRandom = d3.randomLcg(4242);
       const decideRandom = d3.randomLcg(8128);
+      const teamRandom = d3.randomLcg(2718);
+      const directionRandom = d3.randomLcg(31337);
       const pick = (weights, rng = random) => {
         const entries = Object.entries(weights);
         let r = rng() * d3.sum(entries, ([, w]) => w);
@@ -582,6 +617,8 @@
           }
           const reason = switching ? pick(newVendor === "Sirius Cybernetics" ? REASONS_TO_SIRIUS : REASONS_OTHER) : null;
           const decider = reason ? pick(DECIDER_MIX[reason] ?? DECIDER_MIX.other, decideRandom) : null;
+          const informatics = pick(TEAM_MIX[type], teamRandom);
+          const direction = pick(DIRECTION_MIX[informatics], directionRandom);
           const previous = !switching && random() < (cp === "Sirius Cybernetics" ? 0.34 : 0.07)
             ? {vendor: pickExcept(PROFILES[profile], cp), date: between(utc(2021, 6, 1), utc(2026, 9, 1))}
             : null;
@@ -593,7 +630,7 @@
             name,
             consent: showName ? "named" : consentRandom() < 0.6 ? "unnamed" : "aggregate",
             plansPublic: committed && announceRandom() < (status === "Implementing" ? 0.85 : 0.5),
-            country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, decider, previous, board
+            country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, decider, informatics, direction, previous, board
           });
         }
       }
@@ -677,7 +714,8 @@
         switching: filtered.filter((d) => d.status !== "Stable").length,
         committed: committed.length,
         toSirius: committed.filter((d) => d.newVendor === "Sirius Cybernetics").length,
-        upcoming: committed.filter((d) => d.goLive >= utc(2026, 10, 1)).length
+        upcoming: committed.filter((d) => d.goLive >= utc(2026, 10, 1)).length,
+        digitalFirst: filtered.filter((d) => DIGITAL_FIRST.includes(d.direction)).length
       };
     })();
   </script>
@@ -881,12 +919,15 @@
     }
   </script>
   <script type="module">
-    function breakdownChart(rows, key, title) {
+    // Bars sorted by count, or in the given order for ordered answers.
+    function breakdownChart(rows, key, title, order) {
       const movers = rows.filter((d) => d[key]);
       if (!movers.length) return emptyNote();
       const data = d3.rollups(movers, (v) => v.length, (d) => d[key])
         .map(([label, n]) => ({label, n, hidden: suppressed(n)}))
-        .sort((a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.label, b.label));
+        .sort(order
+          ? (a, b) => order.indexOf(a.label) - order.indexOf(b.label)
+          : (a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.label, b.label));
       return Plot.plot({
         width: Math.min(W, 640),
         height: data.length * 28 + 16,
@@ -913,6 +954,32 @@
       const rest = share(movers.filter((d) => !CONSOLIDATION_REASONS.includes(d.reason)));
       if (consolidation.n < MIN_CELL || rest.n < MIN_CELL) return "";
       return html`<p class="viz-note">When consolidation (EHR or merger) drove the move, ${pct(consolidation.outside, consolidation.n)} of decisions were made without lab leadership at the table. For every other reason, ${pct(rest.outside, rest.n)} were.</p>`;
+    }
+
+    function digitalByTeamChart(rows) {
+      const data = INFORMATICS_TEAMS.map((team) => {
+        const labs = rows.filter((d) => d.informatics === team);
+        const n = labs.filter((d) => DIGITAL_FIRST.includes(d.direction)).length;
+        return {team, total: labs.length, n, share: labs.length ? n / labs.length : 0, hidden: suppressed(labs.length) || suppressed(n)};
+      }).filter((d) => d.total);
+      if (!data.length) return emptyNote();
+      const teamLabel = (t) => (t === "None" ? "No in-house team" : t === "More than 10" ? "More than 10 people" : t);
+      return Plot.plot({
+        width: Math.min(W, 640),
+        height: data.length * 28 + 16,
+        marginLeft: 230,
+        marginRight: 130,
+        marginTop: 8,
+        marginBottom: 8,
+        style: PLOT_STYLE,
+        x: {axis: null, domain: [0, d3.max(data, (d) => (d.hidden ? 0 : d.share)) || 1]},
+        y: {domain: data.map((d) => d.team), label: null, tickSize: 0, tickFormat: teamLabel},
+        marks: [
+          Plot.barX(data.filter((d) => !d.hidden), {x: "share", y: "team", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {x: false, y: false}}, channels: {"Informatics team": (d) => teamLabel(d.team), "Digital-first": (d) => `${d.n} of ${d.total} labs`}}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.share), y: "team", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${pct(d.n, d.total)} of ${d.total} labs`), dx: 6, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
+          Plot.ruleX([0], {stroke: AXIS})
+        ]
+      });
     }
   </script>
   <script type="module">
@@ -1187,10 +1254,12 @@
         institution: Inputs.text({label: "Institution name", placeholder: "e.g., Larkmoor University Hospital", width: 320}),
         country: Inputs.select(countryFeatures, {label: "Country", format: (f) => f.properties.name, value: usa}),
         type: Inputs.select(TYPES, {label: "Institution type"}),
+        informatics: Inputs.select(INFORMATICS_TEAMS, {label: "In-house informatics team", value: "3–10 people"}),
         ap: Inputs.select(VENDORS, {label: "Anatomic pathology", value: "Cassandra Health"}),
         cp: Inputs.select(VENDORS, {label: "Clinical pathology", value: "Magrathea Labs"}),
         micro: Inputs.select(VENDORS, {label: "Microbiology", value: "Magrathea Labs"}),
         bb: Inputs.select(VENDORS, {label: "Blood bank", value: "Magrathea Labs"}),
+        direction: Inputs.select(DIRECTIONS, {label: "Where is your lab headed?", value: "LIS plus digital pathology add-ons"}),
         status: Inputs.radio(STATUSES, {label: "Switching status", value: "Implementing"}),
         newVendor: Inputs.select(VENDORS, {label: "New vendor", value: "Sirius Cybernetics"}),
         goLive: Inputs.select([2026, 2027, 2028, 2029, 2030], {label: "Go-live year", value: 2027, format: String}),
@@ -1201,9 +1270,9 @@
       };
       const form = Inputs.form(inputs, {
         template: (i) => html`<div>
-          <div class="survey-step"><span class="step-n">1</span><div><h4>Your lab</h4>${i.institution}${i.country}${i.type}</div></div>
+          <div class="survey-step"><span class="step-n">1</span><div><h4>Your lab</h4>${i.institution}${i.country}${i.type}${i.informatics}</div></div>
           <div class="survey-step"><span class="step-n">2</span><div><h4>Current LIS for each discipline</h4>${i.ap}${i.cp}${i.micro}${i.bb}</div></div>
-          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}${i.decider}</div></div>
+          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.direction}${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}${i.decider}</div></div>
           <div class="survey-step"><span class="step-n">4</span><div><h4>Visibility</h4>${i.consent}</div></div>
         </div>`
       });
@@ -1254,6 +1323,8 @@
           goLive: committed ? utc(v.goLive, v.goLive === 2026 ? 10 : 4, 1) : null,
           reason: v.status === "Stable" ? null : v.reason,
           decider: v.status === "Stable" ? null : v.decider,
+          informatics: v.informatics,
+          direction: v.direction,
           previous: null,
           board: false,
           wave: "Ambassadors",
