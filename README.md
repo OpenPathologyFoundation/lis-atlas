@@ -5,7 +5,7 @@ An open, crowdsourced world map of which laboratory information system (LIS) eve
 > **Prototype.** Every institution, vendor, response, and number is synthetic. The LIS vendors are invented too, borrowed from Greek mythology and *The Hitchhiker's Guide to the Galaxy* (Sirius Cybernetics, Cassandra Health, Magrathea Labs, and friends).
 
 **Live page:** https://openpathologyfoundation.github.io/lis-atlas/  
-**Observable notebook:** https://observablehq.com/@gershkovich/global-lis-atlas
+**Observable notebook:** https://observablehq.com/@gershkovich/lis-atlas
 
 ## What's in it
 
@@ -19,7 +19,7 @@ An open, crowdsourced world map of which laboratory information system (LIS) eve
 
 ## The notebook
 
-The whole atlas is one file, [`docs/index.html`](docs/index.html), in Observable's open [Notebooks 2.0 format](https://observablehq.com/notebook-kit/). You can edit it in a text editor, in [Observable Desktop](https://observablehq.com/notebook-kit/desktop), or on observablehq.com. The [Observable copy](https://observablehq.com/@gershkovich/global-lis-atlas) is edited separately; copy changes back into `docs/index.html` to publish them here. The synthetic data generator and chart code are in the appendix cells at the bottom.
+The whole atlas is one file, [`docs/index.html`](docs/index.html), in Observable's open [Notebooks 2.0 format](https://observablehq.com/notebook-kit/). You can edit it in a text editor, in [Observable Desktop](https://observablehq.com/notebook-kit/desktop), or on observablehq.com. The [Observable copy](https://observablehq.com/@gershkovich/lis-atlas) is edited separately; copy changes back into `docs/index.html` to publish them here. The synthetic data generator and chart code are in the appendix cells at the bottom.
 
 ## Run locally
 
