@@ -121,7 +121,7 @@
   <script type="text/markdown">
     ## Upcoming go-lives
 
-    Every dot is one lab, placed in the quarter it plans to go live. ${fmtCount(summary.upcoming)} go-lives are scheduled between now and 2030, and ${pctOf(summary.toSirius, summary.committed)} of them are moving to Sirius Cybernetics. Hover a dot for the lab and its move. In the public view, labs that chose to be counted in totals only are left out of the dots.
+    Every dot is one lab, placed in the quarter it plans to go live. ${fmtCount(summary.upcoming)} go-lives are scheduled between now and 2030, and ${pctOf(summary.toSirius, summary.committed)} of them are moving to Sirius Cybernetics. Hover a dot for the lab and its move. In the public view, the dots show only plans that labs say are announced or under contract, from labs that agreed to be listed.
   </script>
   <script type="module">
     goLiveTimeline(filtered, discipline.key)
@@ -189,7 +189,7 @@
   <script type="text/markdown">
     ## The data
 
-    Every response the atlas shows, as a searchable table. ${publicView ? "Labs that asked not to be named appear as their type and location, and " + fmtCount(filtered.filter((d) => !listable(d)).length) + " labs that chose totals only aren't listed." : "Staff view: every response, with names and consent levels."}
+    Every response the atlas shows, as a searchable table. ${publicView ? "Labs that asked not to be named appear as their type and location, and " + fmtCount(filtered.filter((d) => !listable(d)).length) + " labs that chose totals only aren't listed. Switching plans show only where the lab says they're announced or under contract; elsewhere the plan columns read \u201c—\u201d." : "Staff view: every response, with names, consent levels, and whether plans are public."}
   </script>
   <script type="module">
     Inputs.table(filtered.filter(listable).map((d) => ({
@@ -200,12 +200,12 @@
       CP: d.lis.cp,
       Micro: d.lis.micro,
       "Blood bank": d.lis.bb,
-      Status: d.status,
-      "New vendor": d.newVendor ?? "",
-      "Go-live": d.goLive ? quarterLabel(d.goLive) : "",
-      Reason: d.reason ?? "",
+      Status: planShown(d) ? d.status : "—",
+      "New vendor": planShown(d) ? d.newVendor ?? "" : "—",
+      "Go-live": planShown(d) ? (d.goLive ? quarterLabel(d.goLive) : "") : "—",
+      Reason: planShown(d) ? d.reason ?? "" : "—",
       Hops: d.degree,
-      ...(publicView ? {} : {Consent: CONSENT_LABELS[d.consent]})
+      ...(publicView ? {} : {Consent: CONSENT_LABELS[d.consent], "Plans public": d.newVendor ? (d.plansPublic ? "Yes" : "Not yet") : ""})
     })), {rows: 14, layout: "auto"})
   </script>
   <script type="text/markdown">
@@ -218,6 +218,7 @@
     - **Named** (${d3.format(",")(consentCounts.get("named") ?? 0)} labs): name shown with systems and announced plans.
     - **Unnamed** (${d3.format(",")(consentCounts.get("unnamed") ?? 0)} labs): systems and plans shown as, say, "a community hospital in Germany". Where a country has fewer than ${MIN_CELL} responding labs, only the region is given.
     - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} labs): counted in maps, charts, and totals, but never listed individually.
+    - **Plans:** a listed lab's new vendor, go-live date, and reason appear only once the lab says they're announced or under contract. "Evaluating" is only ever counted in totals.
     - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} labs is hidden. Map areas are hatched, and counts read "fewer than ${MIN_CELL}". ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
 
     Switch **Show as** to *Staff view* at the top of the page to see the raw data these rules protect. In the live atlas, that view would sit behind a staff login.
@@ -511,6 +512,7 @@
     const seedResponses = (() => {
       const random = d3.randomLcg(20261007);
       const consentRandom = d3.randomLcg(1729);
+      const announceRandom = d3.randomLcg(4242);
       const pick = (weights) => {
         const entries = Object.entries(weights);
         let r = random() * d3.sum(entries, ([, w]) => w);
@@ -573,6 +575,7 @@
             id: `L${String(++serial).padStart(3, "0")}`,
             name,
             consent: showName ? "named" : consentRandom() < 0.6 ? "unnamed" : "aggregate",
+            plansPublic: committed && announceRandom() < (status === "Implementing" ? 0.85 : 0.5),
             country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, previous, board
           });
         }
@@ -636,6 +639,8 @@
     // Unnamed labs in small countries are placed by region, so the country can't single them out.
     const placeOf = (d) => (!publicView || d.consent === "named" || (countryTotals.get(d.countryId) ?? 0) >= MIN_CELL ? d.country : d.region);
     const listable = (d) => !publicView || d.consent !== "aggregate";
+    // A lab's own plans are listed only once it says they're announced or under contract; "Evaluating" never is.
+    const planShown = (d) => !publicView || d.plansPublic;
     function labelOf(d) {
       if (!publicView || d.consent === "named") return d.name;
       if (d.consent === "unnamed") return `${articleFor(d.type)} ${d.type.toLowerCase()} in ${placeOf(d)}`;
@@ -886,7 +891,7 @@
   <script type="module">
     function goLiveTimeline(rows, disc) {
       const live = rows
-        .filter((d) => d.goLive && d.goLive >= utc(2026, 10, 1) && listable(d))
+        .filter((d) => d.goLive && d.goLive >= utc(2026, 10, 1) && listable(d) && planShown(d))
         .map((d) => ({...d, x: new Date(+d.goLive + 45 * 864e5), group: vendorGroup(d.newVendor), from: d.lis[disc], quarter: quarterLabel(d.goLive), lab: labelOf(d), place: placeOf(d)}));
       if (!live.length) return emptyNote();
       const tallest = d3.max(d3.rollup(live, (v) => v.length, (d) => +d.goLive).values());
@@ -1162,6 +1167,7 @@
         status: Inputs.radio(STATUSES, {label: "Switching status", value: "Implementing"}),
         newVendor: Inputs.select(VENDORS, {label: "New vendor", value: "Sirius Cybernetics"}),
         goLive: Inputs.select([2026, 2027, 2028, 2029, 2030], {label: "Go-live year", value: 2027, format: String}),
+        announced: Inputs.radio(["yes", "no"], {label: "Are these plans public?", format: (k) => (k === "yes" ? "Yes: announced or under contract" : "Not yet: count them in totals only"), value: "yes"}),
         reason: Inputs.select(REASONS, {label: "Main reason"}),
         consent: Inputs.radio(CONSENT_LEVELS, {label: "How to show us", format: (k) => CONSENT_CHOICES[k], value: "named"})
       };
@@ -1169,14 +1175,14 @@
         template: (i) => html`<div>
           <div class="survey-step"><span class="step-n">1</span><div><h4>Your lab</h4>${i.institution}${i.country}${i.type}</div></div>
           <div class="survey-step"><span class="step-n">2</span><div><h4>Current LIS for each discipline</h4>${i.ap}${i.cp}${i.micro}${i.bb}</div></div>
-          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.status}${i.newVendor}${i.goLive}${i.reason}</div></div>
+          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}</div></div>
           <div class="survey-step"><span class="step-n">4</span><div><h4>Visibility</h4>${i.consent}</div></div>
         </div>`
       });
       const sync = () => {
         const s = inputs.status.value;
         const committed = s === "Selected" || s === "Implementing";
-        inputs.newVendor.style.display = inputs.goLive.style.display = committed ? "" : "none";
+        inputs.newVendor.style.display = inputs.goLive.style.display = inputs.announced.style.display = committed ? "" : "none";
         inputs.reason.style.display = s === "Stable" ? "none" : "";
       };
       // Keep keystrokes in the form from re-running the charts; only Submit does that.
@@ -1209,6 +1215,7 @@
           id: `NEW${container.value.length + 1}`,
           name,
           consent: v.consent,
+          plansPublic: committed && v.announced === "yes",
           country,
           countryId: f.id,
           region: regionOf(f),
@@ -1236,12 +1243,13 @@
           aggregate: "Your lab will count toward the totals but won't be listed"
         }[v.consent];
         const refLabel = ref.consent === "named" ? `${ref.name} (${ref.country})` : "a colleague's lab";
+        const plansNote = v.status === "Evaluating" ? " While you're evaluating, your plans count toward totals only." : committed && v.announced !== "yes" ? " Your plans count toward totals only until you tell us they're announced." : "";
         const code = Math.random().toString(36).slice(2, 7).toUpperCase();
         const link = `https://atlas.example.org/join?ref=${code}`;
         const copy = html`<button type="button">Copy</button>`;
         copy.onclick = () => navigator.clipboard?.writeText(link).then(() => (copy.textContent = "Copied"));
         message.replaceChildren(html`<div class="survey-thanks">
-          <p><b>Thank you!</b> ${appearAs}. Scroll up to see ${country} on the <a href="#atlas-coverage">coverage map</a> and your lab in the <a href="#atlas-network">referral network</a>.</p>
+          <p><b>Thank you!</b> ${appearAs}.${plansNote} Scroll up to see ${country} on the <a href="#atlas-coverage">coverage map</a> and your lab in the <a href="#atlas-network">referral network</a>.</p>
           <p>You arrived through a link from <b>${refLabel}</b>, so you are <b>${record.degree} ${record.degree === 1 ? "hop" : "hops"}</b> from the Association board.</p>
           <div class="survey-ref"><span>Your referral link</span><code>${link}</code>${copy}</div>
           <p style="margin-bottom:6px">Forward it to a colleague at another institution. Every lab they bring in becomes part of your branch.</p>
