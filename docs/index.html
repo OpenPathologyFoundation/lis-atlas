@@ -57,8 +57,9 @@
       .survey-share button:disabled { opacity: 0.55; cursor: not-allowed; }
       .viz-note { margin: 6px 0 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #6f6e69; }
       .viz-note a { color: inherit; }
-      /* Collapses code-only cells on the GitHub Pages build. Leave this rule out on observablehq.com: it breaks Observable's cell sizing and cuts off the end of the notebook. */
-      .observablehq--cell:empty { display: none; }
+      /* Collapses code-only cells and drops the "<empty>"/"<style>" labels observablehq.com adds to them. Don't use display: none here: Observable sizes each cell from the next cell's offsetTop, so hidden cells cut off the end of the notebook. */
+      .observablehq--cell:not(.observablehq--pending):is(:empty, :has(> style:only-child)) { margin-top: 0; margin-bottom: 0; min-height: 0; }
+      .observablehq--cell:not(.observablehq--pending):is(:empty, :has(> style:only-child))::after { content: none !important; }
     </style>
   </script>
   <script type="module">
