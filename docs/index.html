@@ -55,6 +55,8 @@
       .survey-ref button, .survey-share button { padding: 5px 10px; border-radius: 6px; border: 1px solid #b7d3f6; background: white; color: #184f95; font: 600 12.5px/1 system-ui, sans-serif; cursor: pointer; }
       .survey-share { display: flex; gap: 8px; flex-wrap: wrap; }
       .survey-share button:disabled { opacity: 0.55; cursor: not-allowed; }
+      .viz-note { margin: 6px 0 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #6f6e69; }
+      .viz-note a { color: inherit; }
       /* Collapses code-only cells on the GitHub Pages build. Leave this rule out on observablehq.com: it breaks Observable's cell sizing and cuts off the end of the notebook. */
       .observablehq--cell:empty { display: none; }
     </style>
@@ -63,18 +65,21 @@
     const disciplineInput = Inputs.radio(DISCIPLINES, {label: "Discipline", format: (d) => d.label, value: DISCIPLINES[0]});
     const regionInput = Inputs.select(["All regions", ...REGIONS], {label: "Region"});
     const typeInput = Inputs.select(["All institution types", ...TYPES], {label: "Institution type"});
-    display(html`<div class="atlas-filters">${disciplineInput}${regionInput}${typeInput}</div>`);
+    const audienceInput = Inputs.radio(AUDIENCES, {label: "Show as", value: AUDIENCES[0]});
+    display(html`<div class="atlas-filters">${disciplineInput}${regionInput}${typeInput}${audienceInput}</div>`);
+    display(html`<p class="viz-note" style="margin: -6px 0 12px;">The public view hides anything based on fewer than ${MIN_CELL} labs and lists labs only as their consent allows. <a href="#atlas-privacy">How respondents are protected</a></p>`);
     const discipline = Generators.input(disciplineInput);
     const region = Generators.input(regionInput);
     const instType = Generators.input(typeInput);
+    const audience = Generators.input(audienceInput);
   </script>
   <script type="module">
     html`<div class="kpis">
-      ${kpi("Labs responding", d3.format(",")(summary.n), `from ${summary.countries} countries`)}
+      ${kpi("Labs responding", fmtCount(summary.n), suppressed(summary.n) ? "too few to show details" : `from ${summary.countries} countries`)}
       ${kpi("Countries covered", `${summary.countries} of 195`, `${195 - summary.countries} still blank`)}
-      ${kpi("Changing LIS", pct(summary.switching, summary.n), `${summary.switching} evaluating, selected, or implementing`)}
-      ${kpi("Go-lives scheduled", summary.upcoming, "Q4 2026 through 2030")}
-      ${kpi("Picking Sirius Cybernetics", pct(summary.toSirius, summary.committed), `of ${summary.committed} labs that chose a vendor`)}
+      ${kpi("Changing LIS", pctOf(summary.switching, summary.n), `${fmtCount(summary.switching)} evaluating, selected, or implementing`)}
+      ${kpi("Go-lives scheduled", fmtCount(summary.upcoming), "Q4 2026 through 2030")}
+      ${kpi("Picking Sirius Cybernetics", pctOf(summary.toSirius, summary.committed), `of ${fmtCount(summary.committed)} labs that chose a vendor`)}
     </div>`
   </script>
   <script type="text/markdown">
@@ -82,7 +87,7 @@
 
     ## Who runs what
 
-    Each country is colored by the most common ${discipline.label.toLowerCase()} LIS among responding labs. Blue, orange, and green mark the three largest vendors; gray groups everyone else. Hover a country for its top two systems. The small maps further down show where each major vendor is strongest.
+    Each country is colored by the most common ${discipline.label.toLowerCase()} LIS among responding labs. Blue, orange, and green mark the three largest vendors; gray groups everyone else. Hover a country for its top two systems. The small maps further down show where each major vendor is strongest. In the public view, a country is hatched instead of colored when no vendor there has at least ${MIN_CELL} labs, so no single lab's system can be read off the map.
   </script>
   <script type="module">
     vendorMap(filtered, discipline.key, region)
@@ -102,7 +107,7 @@
   <script type="text/markdown">
     ## Who's switching, and to what
 
-    ${summary.switching} labs (${pct(summary.switching, summary.n)}) are evaluating, have selected, or are implementing a new LIS. Read the flow left to right: the ${discipline.label.toLowerCase()} system they run today, then the system they are moving to. Labs still evaluating have not picked a vendor yet.
+    ${fmtCount(summary.switching)} labs (${pctOf(summary.switching, summary.n)}) are evaluating, have selected, or are implementing a new LIS. Read the flow left to right: the ${discipline.label.toLowerCase()} system they run today, then the system they are moving to. Labs still evaluating have not picked a vendor yet. In the public view, moves made by fewer than ${MIN_CELL} labs are left out.
   </script>
   <script type="module">
     migrationSankey(filtered, discipline.key)
@@ -116,7 +121,7 @@
   <script type="text/markdown">
     ## Upcoming go-lives
 
-    Every dot is one lab, placed in the quarter it plans to go live. ${summary.upcoming} go-lives are scheduled between now and 2030, and ${pct(summary.toSirius, summary.committed)} of them are moving to Sirius Cybernetics. Hover a dot for the lab and its move.
+    Every dot is one lab, placed in the quarter it plans to go live. ${fmtCount(summary.upcoming)} go-lives are scheduled between now and 2030, and ${pctOf(summary.toSirius, summary.committed)} of them are moving to Sirius Cybernetics. Hover a dot for the lab and its move. In the public view, labs that chose to be counted in totals only are left out of the dots.
   </script>
   <script type="module">
     goLiveTimeline(filtered, discipline.key)
@@ -146,6 +151,8 @@
     </div>`
   </script>
   <script type="text/markdown">
+    <a id="atlas-coverage"></a>
+
     ## Where the map is still blank
 
     Coverage drives the call to action. Each blank country needs a regional ambassador, and countries with only a handful of responses need a second push. ${blankSpots.length ? "The most populous blank countries are listed below the map." : ""}
@@ -182,12 +189,12 @@
   <script type="text/markdown">
     ## The data
 
-    Every response the atlas shows, as a searchable table. Labs that chose not to be named appear as their type and country.
+    Every response the atlas shows, as a searchable table. ${publicView ? "Labs that asked not to be named appear as their type and location, and " + fmtCount(filtered.filter((d) => !listable(d)).length) + " labs that chose totals only aren't listed." : "Staff view: every response, with names and consent levels."}
   </script>
   <script type="module">
-    Inputs.table(filtered.map((d) => ({
-      Institution: d.displayName,
-      Country: d.country,
+    Inputs.table(filtered.filter(listable).map((d) => ({
+      Institution: labelOf(d),
+      Country: placeOf(d),
       Type: d.type,
       AP: d.lis.ap,
       CP: d.lis.cp,
@@ -197,8 +204,23 @@
       "New vendor": d.newVendor ?? "",
       "Go-live": d.goLive ? quarterLabel(d.goLive) : "",
       Reason: d.reason ?? "",
-      Hops: d.degree
+      Hops: d.degree,
+      ...(publicView ? {} : {Consent: CONSENT_LABELS[d.consent]})
     })), {rows: 14, layout: "auto"})
+  </script>
+  <script type="text/markdown">
+    <a id="atlas-privacy"></a>
+
+    ## How respondents are protected
+
+    Every lab picks one of three consent levels in the survey, and the public view applies two rules on top of them.
+
+    - **Named** (${d3.format(",")(consentCounts.get("named") ?? 0)} labs): name shown with systems and announced plans.
+    - **Unnamed** (${d3.format(",")(consentCounts.get("unnamed") ?? 0)} labs): systems and plans shown as, say, "a community hospital in Germany". Where a country has fewer than ${MIN_CELL} responding labs, only the region is given.
+    - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} labs): counted in maps, charts, and totals, but never listed individually.
+    - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} labs is hidden. Map areas are hatched, and counts read "fewer than ${MIN_CELL}". ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
+
+    Switch **Show as** to *Staff view* at the top of the page to see the raw data these rules protect. In the live atlas, that view would sit behind a staff login.
   </script>
   <script type="text/markdown">
     ## From prototype to live
@@ -223,6 +245,13 @@
     const MULTIPLE_VENDORS = ["Sirius Cybernetics", "Cassandra Health", "Magrathea Labs", "Babel Fish Health", "Labyrinth Clinical", "Heart of Gold Medical"];
     const COVERAGE_BINS = ["No responses yet", "1–4", "5–14", "15–49", "50+"];
     const COVERAGE_COLORS = [BLANK, "#86b6ef", "#3987e5", "#184f95", "#0d366b"];
+    // Privacy rules: the smallest group the public view will show, and the survey's consent levels.
+    const MIN_CELL = 5;
+    const CONSENT_LEVELS = ["named", "unnamed", "aggregate"];
+    const CONSENT_LABELS = {named: "Named", unnamed: "Unnamed", aggregate: "Totals only"};
+    const CONSENT_CHOICES = {named: "Show our name with our systems and plans", unnamed: "Show our systems and plans, but not our name", aggregate: "Count us in totals only; don't list us"};
+    const AUDIENCES = ["Public view", "Staff view (raw data)"];
+    const HATCH_CSS = "repeating-linear-gradient(45deg, #ecebe6 0 3px, #b9b7ae 3px 4.5px)";
     const INK = "#0b0b0b";
     const INK2 = "#52514e";
     const MUTED = "#898781";
@@ -261,6 +290,17 @@
     const vendorColor = (v) => (v === UNDECIDED ? UNDECIDED_COLOR : GROUP_COLORS[GROUPS.indexOf(vendorGroup(v))]);
     const pct = (a, b) => (b ? d3.format(".0%")(a / b) : "—");
     const quarterLabel = (date) => `Q${Math.floor(date.getUTCMonth() / 3) + 1} ${date.getUTCFullYear()}`;
+    const articleFor = (s) => (/^[aeiou]/i.test(s) ? "An" : "A");
+    const hatchId = () => `hatch-${Math.random().toString(36).slice(2, 9)}`;
+
+    // A diagonal hatch for map areas hidden by small-cell suppression.
+    function hatchDefs(id) {
+      return () => svg`<defs><pattern id=${id} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#ecebe6"></rect><line x1="1" y1="0" x2="1" y2="6" stroke="#b9b7ae" stroke-width="2"></line></pattern></defs>`;
+    }
+
+    function swatchLegend(items) {
+      return html`<div class="swatches">${items.map(([label, fill]) => html`<span><i style="border-radius: 2px; background: ${fill};"></i>${label}</span>`)}</div>`;
+    }
 
     function kpi(label, value, note) {
       return html`<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-note">${note}</div></div>`;
@@ -470,6 +510,7 @@
   <script type="module">
     const seedResponses = (() => {
       const random = d3.randomLcg(20261007);
+      const consentRandom = d3.randomLcg(1729);
       const pick = (weights) => {
         const entries = Object.entries(weights);
         let r = random() * d3.sum(entries, ([, w]) => w);
@@ -490,7 +531,6 @@
       };
       const choice = (array) => array[Math.floor(random() * array.length)];
       const between = (a, b, skew = 1) => new Date(+a + (b - a) * random() ** skew);
-      const article = (s) => (/^[aeiou]/i.test(s) ? "An" : "A");
       const used = new Set();
       const placeName = () => {
         for (;;) {
@@ -532,8 +572,7 @@
           rows.push({
             id: `L${String(++serial).padStart(3, "0")}`,
             name,
-            showName,
-            displayName: showName ? name : `${article(type)} ${type.toLowerCase()} in ${country}`,
+            consent: showName ? "named" : consentRandom() < 0.6 ? "unnamed" : "aggregate",
             country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, previous, board
           });
         }
@@ -589,6 +628,25 @@
     );
   </script>
   <script type="module">
+    const publicView = audience === AUDIENCES[0];
+    const suppressed = (n) => publicView && n > 0 && n < MIN_CELL;
+    const fmtCount = (n) => (suppressed(n) ? `fewer than ${MIN_CELL}` : d3.format(",")(n));
+    const pctOf = (a, b) => (suppressed(b) ? "—" : pct(a, b));
+    const countryTotals = d3.rollup(responses, (v) => v.length, (d) => d.countryId);
+    // Unnamed labs in small countries are placed by region, so the country can't single them out.
+    const placeOf = (d) => (!publicView || d.consent === "named" || (countryTotals.get(d.countryId) ?? 0) >= MIN_CELL ? d.country : d.region);
+    const listable = (d) => !publicView || d.consent !== "aggregate";
+    function labelOf(d) {
+      if (!publicView || d.consent === "named") return d.name;
+      if (d.consent === "unnamed") return `${articleFor(d.type)} ${d.type.toLowerCase()} in ${placeOf(d)}`;
+      return "A lab counted in totals only";
+    }
+    const consentCounts = d3.rollup(responses, (v) => v.length, (d) => d.consent);
+    const hatchedCountries = d3.sum(d3.group(filtered, (d) => d.countryId).values(), (list) =>
+      d3.max(d3.rollup(list, (v) => v.length, (d) => d.lis[discipline.key]).values()) < MIN_CELL ? 1 : 0
+    );
+  </script>
+  <script type="module">
     const summary = (() => {
       const committed = filtered.filter((d) => d.newVendor);
       return {
@@ -613,23 +671,36 @@
 
     function vendorMap(rows, disc, region) {
       const stats = countryStats(rows, disc);
+      // Small-cell suppression: color a country only when its leading vendor has at least MIN_CELL labs.
+      const hidden = (f) => suppressed(stats.get(f.id).counts[0][1]);
       const describe = (f, i) => {
         const s = stats.get(f.id);
         const c = s.counts[i];
-        return c ? `${c[0]} (${pct(c[1], s.n)})` : "—";
+        return !c ? "—" : suppressed(c[1]) ? `hidden (fewer than ${MIN_CELL} labs)` : `${c[0]} (${pct(c[1], s.n)})`;
       };
-      return Plot.plot({
+      const id = hatchId();
+      const plot = Plot.plot({
         width: mapWidth(region),
         style: PLOT_STYLE,
         projection: projectionFor(region),
-        color: {type: "ordinal", domain: [...GROUPS, "No responses yet"], range: [...GROUP_COLORS, BLANK], legend: true},
+        color: {type: "ordinal", domain: GROUPS, range: GROUP_COLORS},
         marks: [
+          hatchDefs(id),
           Plot.geo(countryFeatures.filter((f) => !stats.has(f.id)), Plot.centroid({
             fill: BLANK,
             tip: {format: {x: false, y: false}},
             channels: {Country: (f) => f.properties.name, Status: () => "No responses yet"}
           })),
-          Plot.geo(countryFeatures.filter((f) => stats.has(f.id)), Plot.centroid({
+          Plot.geo(countryFeatures.filter((f) => stats.has(f.id) && hidden(f)), Plot.centroid({
+            fill: `url(#${id})`,
+            tip: {format: {x: false, y: false}},
+            channels: {
+              Country: (f) => f.properties.name,
+              "Labs responding": (f) => fmtCount(stats.get(f.id).n),
+              Status: () => `Hidden: no vendor here has ${MIN_CELL} or more labs`
+            }
+          })),
+          Plot.geo(countryFeatures.filter((f) => stats.has(f.id) && !hidden(f)), Plot.centroid({
             fill: (f) => vendorGroup(stats.get(f.id).counts[0][0]),
             tip: {format: {x: false, y: false, fill: false}},
             channels: {
@@ -642,6 +713,11 @@
           Plot.geo(borders, {stroke: "white", strokeWidth: 0.6})
         ]
       });
+      return html`<div>${swatchLegend([
+        ...GROUPS.map((group, i) => [group, GROUP_COLORS[i]]),
+        ...(publicView ? [[`Hidden (fewer than ${MIN_CELL} labs)`, HATCH_CSS]] : []),
+        ["No responses yet", BLANK]
+      ])}${plot}</div>`;
     }
 
     function vendorSmallMultiples(rows, disc, region) {
@@ -652,26 +728,38 @@
       const gap = 18;
       const w = Math.floor((W - (cols - 1) * gap) / cols);
       const color = {type: "linear", domain: [0, 1], interpolate: d3.interpolateRgbBasis(SHARE_RAMP), tickFormat: "%", label: "Share of responding labs in the country"};
-      const maps = MULTIPLE_VENDORS.map((vendor) => html`<div>
-        <div style="font: 600 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; color: ${INK};">${vendor}</div>
-        ${Plot.plot({
-          width: w,
-          style: PLOT_STYLE,
-          projection: projectionFor(region),
-          color,
-          marks: [
-            Plot.geo(land, {fill: BLANK}),
-            Plot.geo(covered, Plot.centroid({
-              fill: (f) => stats.get(f.id).share(vendor),
-              tip: {format: {x: false, y: false, fill: false}},
-              channels: {Country: (f) => f.properties.name, [`On ${vendor}`]: (f) => pct(stats.get(f.id).share(vendor), 1), "Labs responding": (f) => stats.get(f.id).n}
-            })),
-            Plot.geo(borders, {stroke: "white", strokeWidth: 0.4})
-          ]
-        })}
-      </div>`);
+      const maps = MULTIPLE_VENDORS.map((vendor) => {
+        const id = hatchId();
+        const count = (f) => stats.get(f.id).counts.find(([k]) => k === vendor)?.[1] ?? 0;
+        // Hide a country when it has too few labs overall, or too few on this vendor.
+        const hidden = (f) => suppressed(stats.get(f.id).n) || (count(f) > 0 && suppressed(count(f)));
+        return html`<div>
+          <div style="font: 600 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; color: ${INK};">${vendor}</div>
+          ${Plot.plot({
+            width: w,
+            style: PLOT_STYLE,
+            projection: projectionFor(region),
+            color,
+            marks: [
+              hatchDefs(id),
+              Plot.geo(land, {fill: BLANK}),
+              Plot.geo(covered.filter((f) => !hidden(f)), Plot.centroid({
+                fill: (f) => stats.get(f.id).share(vendor),
+                tip: {format: {x: false, y: false, fill: false}},
+                channels: {Country: (f) => f.properties.name, [`On ${vendor}`]: (f) => pct(stats.get(f.id).share(vendor), 1), "Labs responding": (f) => stats.get(f.id).n}
+              })),
+              Plot.geo(covered.filter((f) => hidden(f)), Plot.centroid({
+                fill: `url(#${id})`,
+                tip: {format: {x: false, y: false}},
+                channels: {Country: (f) => f.properties.name, Status: () => `Hidden: fewer than ${MIN_CELL} labs`}
+              })),
+              Plot.geo(borders, {stroke: "white", strokeWidth: 0.4})
+            ]
+          })}
+        </div>`;
+      });
       return html`<div>
-        ${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 24px;">${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}${publicView ? swatchLegend([[`Hidden (fewer than ${MIN_CELL} labs)`, HATCH_CSS]]) : ""}</div>
         <div style="display: grid; grid-template-columns: repeat(${cols}, ${w}px); gap: 10px ${gap}px; margin-top: 6px;">${maps}</div>
       </div>`;
     }
@@ -680,13 +768,13 @@
     function installedBase(rows, disc) {
       if (!rows.length) return emptyNote();
       const data = d3.rollups(rows, (v) => v.length, (d) => d.lis[disc])
-        .map(([vendor, n]) => ({vendor, n, share: n / rows.length}))
-        .sort((a, b) => d3.descending(a.n, b.n));
+        .map(([vendor, n]) => ({vendor, n, hidden: suppressed(n)}))
+        .sort((a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.vendor, b.vendor));
       return Plot.plot({
         width: Math.min(W, 640),
         height: data.length * 26 + 16,
         marginLeft: 150,
-        marginRight: 80,
+        marginRight: 90,
         marginTop: 8,
         marginBottom: 8,
         style: PLOT_STYLE,
@@ -694,11 +782,11 @@
         y: {domain: data.map((d) => d.vendor), label: null, tickSize: 0},
         color: {domain: GROUPS, range: GROUP_COLORS},
         marks: [
-          Plot.barX(data, {
+          Plot.barX(data.filter((d) => !d.hidden), {
             x: "n", y: "vendor", fill: (d) => vendorGroup(d.vendor), insetTop: 3, insetBottom: 3, rx2: 4,
             tip: {format: {fill: false, y: false}}, channels: {Vendor: "vendor", Share: (d) => pct(d.n, rows.length)}
           }),
-          Plot.text(data, {x: "n", y: "vendor", text: (d) => `${d.n} · ${pct(d.n, rows.length)}`, dx: 6, textAnchor: "start", fill: INK2}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "vendor", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${d.n} · ${pct(d.n, rows.length)}`), dx: 6, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
           Plot.ruleX([0], {stroke: AXIS})
         ]
       });
@@ -712,7 +800,11 @@
       const movers = rows.filter((d) => d.status !== "Stable");
       if (!movers.length) return emptyNote();
       const flows = d3.rollups(movers, (v) => v.length, (d) => d.lis[disc], (d) => d.newVendor ?? UNDECIDED);
-      const links = flows.flatMap(([from, tos]) => tos.map(([to, value]) => ({source: `from:${from}`, target: `to:${to}`, value})));
+      const allLinks = flows.flatMap(([from, tos]) => tos.map(([to, value]) => ({source: `from:${from}`, target: `to:${to}`, value})));
+      // Small-cell suppression: leave out moves made by fewer than MIN_CELL labs in the public view.
+      const links = allLinks.filter((l) => !suppressed(l.value));
+      const hiddenLabs = d3.sum(allLinks, (l) => (suppressed(l.value) ? l.value : 0));
+      if (!links.length) return html`<p class="empty-note">Every move in this view involves fewer than ${MIN_CELL} labs, so none are shown.</p>`;
       const ids = [...new Set(links.flatMap((l) => [l.source, l.target]))];
       const nodes = ids.map((id) => ({id, name: id.slice(id.indexOf(":") + 1), side: id.startsWith("from:") ? "from" : "to"}));
       const tallest = Math.max(...["from", "to"].map((side) => nodes.filter((n) => n.side === side).length));
@@ -762,6 +854,7 @@
         .data([["RUNS TODAY", marginL, "start"], ["MOVING TO", w - marginR, "end"]]).join("text")
         .attr("x", (d) => d[1]).attr("y", 12).attr("text-anchor", (d) => d[2]).text((d) => d[0]);
       wrap.append(svg.node());
+      if (hiddenLabs) wrap.append(html`<p class="viz-note">${hiddenLabs} more labs are in moves made by fewer than ${MIN_CELL} labs each, which the public view leaves out.</p>`);
       return wrap;
     }
   </script>
@@ -769,20 +862,22 @@
     function reasonsChart(rows) {
       const movers = rows.filter((d) => d.reason);
       if (!movers.length) return emptyNote();
-      const data = d3.rollups(movers, (v) => v.length, (d) => d.reason).map(([reason, n]) => ({reason, n})).sort((a, b) => d3.descending(a.n, b.n));
+      const data = d3.rollups(movers, (v) => v.length, (d) => d.reason)
+        .map(([reason, n]) => ({reason, n, hidden: suppressed(n)}))
+        .sort((a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.reason, b.reason));
       return Plot.plot({
         width: Math.min(W, 640),
         height: data.length * 28 + 16,
         marginLeft: 230,
-        marginRight: 80,
+        marginRight: 90,
         marginTop: 8,
         marginBottom: 8,
         style: PLOT_STYLE,
         x: {axis: null},
         y: {domain: data.map((d) => d.reason), label: null, tickSize: 0},
         marks: [
-          Plot.barX(data, {x: "n", y: "reason", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {Reason: "reason"}}),
-          Plot.text(data, {x: "n", y: "reason", text: (d) => `${d.n} · ${pct(d.n, movers.length)}`, dx: 6, textAnchor: "start", fill: INK2}),
+          Plot.barX(data.filter((d) => !d.hidden), {x: "n", y: "reason", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {Reason: "reason"}}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "reason", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${d.n} · ${pct(d.n, movers.length)}`), dx: 6, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
           Plot.ruleX([0], {stroke: AXIS})
         ]
       });
@@ -791,8 +886,8 @@
   <script type="module">
     function goLiveTimeline(rows, disc) {
       const live = rows
-        .filter((d) => d.goLive && d.goLive >= utc(2026, 10, 1))
-        .map((d) => ({...d, x: new Date(+d.goLive + 45 * 864e5), group: vendorGroup(d.newVendor), from: d.lis[disc], quarter: quarterLabel(d.goLive)}));
+        .filter((d) => d.goLive && d.goLive >= utc(2026, 10, 1) && listable(d))
+        .map((d) => ({...d, x: new Date(+d.goLive + 45 * 864e5), group: vendorGroup(d.newVendor), from: d.lis[disc], quarter: quarterLabel(d.goLive), lab: labelOf(d), place: placeOf(d)}));
       if (!live.length) return emptyNote();
       const tallest = d3.max(d3.rollup(live, (v) => v.length, (d) => +d.goLive).values());
       const step = 11;
@@ -811,7 +906,7 @@
           Plot.dot(live, Plot.stackY2({
             x: "x", fill: "group", order: GROUPS, r: 4.5, stroke: SURFACE, strokeWidth: 1,
             tip: {format: {x: false, y: false, fill: false}},
-            channels: {Lab: "displayName", Country: "country", From: "from", To: "newVendor", "Go-live": "quarter", Status: "status"}
+            channels: {Lab: "lab", Where: "place", From: "from", To: "newVendor", "Go-live": "quarter", Status: "status"}
           }))
         ]
       });
@@ -820,6 +915,7 @@
   <script type="module">
     function shareOverTime(rows, disc) {
       if (!rows.length) return emptyNote();
+      if (suppressed(rows.length)) return html`<p class="empty-note">Fewer than ${MIN_CELL} labs match these filters, so shares aren't shown.</p>`;
       const vendorAt = (d, date) => {
         if (d.goLive && d.goLive <= date) return d.newVendor;
         if (d.previous && date < d.previous.date) return d.previous.vendor;
@@ -920,7 +1016,7 @@
         .attr("stroke-width", (n) => (n.d?.board ? 1.5 : 0.8))
         .attr("opacity", (n) => (isVisible(n) ? 1 : 0.15));
       const hub = byId.get("ASSOC");
-      const labelled = [hub, ...nodes.filter((n) => n.d && visible.has(n.id) && n.d.showName && !n.d.board).sort((a, b) => b.children - a.children).slice(0, 3)];
+      const labelled = [hub, ...nodes.filter((n) => n.d && visible.has(n.id) && (!publicView || n.d.consent === "named") && !n.d.board).sort((a, b) => b.children - a.children).slice(0, 3)];
       svg.append("g").selectAll("text").data(labelled).join("text")
         .attr("x", (n) => sx(n.x) + rOf(n) + 4).attr("y", (n) => sy(n.y)).attr("dy", "0.35em")
         .attr("fill", INK).attr("stroke", SURFACE).attr("stroke-width", 3).attr("paint-order", "stroke")
@@ -939,9 +1035,10 @@
         link.attr("stroke-opacity", (l) => (onChain.has(l.target.id) && onChain.has(l.source.id) ? 1 : 0.08)).attr("stroke", (l) => (onChain.has(l.target.id) && onChain.has(l.source.id) ? INK : AXIS));
         if (!n.d) return tip.show(event, "The Association", [[`${board.length}`, "board members seeded the survey"]]);
         // The referral chain from the board down to this lab, shortened in the middle when long.
-        const steps = chain.slice().reverse().filter((c) => c.d).map((c, i) => [`${i}`, `${c.d.displayName}${c.d.board ? " (board)" : ""}, ${c.d.country}`]);
+        const stepLabel = (d) => `${labelOf(d)}${!publicView || d.consent === "named" ? `, ${d.country}` : ""}${d.board ? " (board)" : ""}`;
+        const steps = chain.slice().reverse().filter((c) => c.d).map((c, i) => [`${i}`, stepLabel(c.d)]);
         const shown = steps.length > 6 ? [...steps.slice(0, 2), ["…", `${steps.length - 4} more labs`], ...steps.slice(-2)] : steps;
-        tip.show(event, n.d.displayName, [
+        tip.show(event, labelOf(n.d), [
           [`${n.d.degree}`, n.d.degree === 1 ? "hop from the board" : "hops from the board", fillOf(n)],
           [`${n.children}`, n.children === 1 ? "lab referred" : "labs referred"],
           ...(steps.length > 1 ? [["", "Referral chain:"], ...shown.slice(0, -1)] : [])
@@ -978,9 +1075,9 @@
 
     function topConnectors(rows) {
       const children = d3.rollup(responses, (v) => v.length, (d) => d.referrer);
-      const top = rows.filter((d) => !d.board && children.get(d.id)).sort((a, b) => children.get(b.id) - children.get(a.id)).slice(0, 6);
+      const top = rows.filter((d) => !d.board && listable(d) && children.get(d.id)).sort((a, b) => children.get(b.id) - children.get(a.id)).slice(0, 6);
       if (!top.length) return emptyNote();
-      return html`<ol class="leaders">${top.map((d) => html`<li><b>${children.get(d.id)}</b><div>${d.displayName}<br><span>${d.country} · ${d.degree} ${d.degree === 1 ? "hop" : "hops"} from the board</span></div></li>`)}</ol>`;
+      return html`<ol class="leaders">${top.map((d) => html`<li><b>${children.get(d.id)}</b><div>${labelOf(d)}<br><span>${!publicView || d.consent === "named" ? `${d.country} · ` : ""}${d.degree} ${d.degree === 1 ? "hop" : "hops"} from the board</span></div></li>`)}</ol>`;
     }
   </script>
   <script type="module">
@@ -992,19 +1089,23 @@
       .slice(0, 16);
 
     function coverageMap(rows, region) {
-      const bin = (n) => (!n ? COVERAGE_BINS[0] : n < 5 ? COVERAGE_BINS[1] : n < 15 ? COVERAGE_BINS[2] : n < 50 ? COVERAGE_BINS[3] : COVERAGE_BINS[4]);
+      const bins = publicView ? [COVERAGE_BINS[0], `Fewer than ${MIN_CELL}`, ...COVERAGE_BINS.slice(2)] : COVERAGE_BINS;
+      const bin = (n) => (!n ? bins[0] : n < 5 ? bins[1] : n < 15 ? bins[2] : n < 50 ? bins[3] : bins[4]);
       return Plot.plot({
         width: mapWidth(region),
         style: PLOT_STYLE,
         projection: projectionFor(region),
-        color: {type: "ordinal", domain: COVERAGE_BINS, range: COVERAGE_COLORS, legend: true},
+        color: {type: "ordinal", domain: bins, range: COVERAGE_COLORS, legend: true},
         marks: [
           Plot.geo(countryFeatures, Plot.centroid({
             fill: (f) => bin(coverageCounts.get(f.id)),
             tip: {format: {x: false, y: false, fill: false}},
             channels: {
               Country: (f) => f.properties.name,
-              Responses: (f) => coverageCounts.get(f.id) ?? 0,
+              Responses: (f) => {
+                const n = coverageCounts.get(f.id) ?? 0;
+                return n ? fmtCount(n) : "0";
+              },
               Status: (f) => {
                 const n = coverageCounts.get(f.id);
                 return !n ? "Blank: ambassador wanted" : n < 5 ? "Thin: needs a second push" : "Covered";
@@ -1062,14 +1163,14 @@
         newVendor: Inputs.select(VENDORS, {label: "New vendor", value: "Sirius Cybernetics"}),
         goLive: Inputs.select([2026, 2027, 2028, 2029, 2030], {label: "Go-live year", value: 2027, format: String}),
         reason: Inputs.select(REASONS, {label: "Main reason"}),
-        showName: Inputs.toggle({label: "OK to show our name", value: true})
+        consent: Inputs.radio(CONSENT_LEVELS, {label: "How to show us", format: (k) => CONSENT_CHOICES[k], value: "named"})
       };
       const form = Inputs.form(inputs, {
         template: (i) => html`<div>
           <div class="survey-step"><span class="step-n">1</span><div><h4>Your lab</h4>${i.institution}${i.country}${i.type}</div></div>
           <div class="survey-step"><span class="step-n">2</span><div><h4>Current LIS for each discipline</h4>${i.ap}${i.cp}${i.micro}${i.bb}</div></div>
           <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.status}${i.newVendor}${i.goLive}${i.reason}</div></div>
-          <div class="survey-step"><span class="step-n">4</span><div><h4>Visibility</h4>${i.showName}</div></div>
+          <div class="survey-step"><span class="step-n">4</span><div><h4>Visibility</h4>${i.consent}</div></div>
         </div>`
       });
       const sync = () => {
@@ -1107,8 +1208,7 @@
         const record = {
           id: `NEW${container.value.length + 1}`,
           name,
-          showName: v.showName,
-          displayName: v.showName ? name : `${/^[aeiou]/i.test(v.type) ? "An" : "A"} ${v.type.toLowerCase()} in ${country}`,
+          consent: v.consent,
           country,
           countryId: f.id,
           region: regionOf(f),
@@ -1128,13 +1228,21 @@
         };
         container.value = [...container.value, record];
         container.dispatchEvent(new Event("input", {bubbles: true}));
+        const countryN = seedResponses.filter((d) => d.countryId === f.id).length + 1;
+        const place = countryN >= MIN_CELL ? country : record.region;
+        const appearAs = {
+          named: `${name} will appear in the atlas by name`,
+          unnamed: `Your lab will appear as ${articleFor(v.type).toLowerCase()} ${v.type.toLowerCase()} in ${place}`,
+          aggregate: "Your lab will count toward the totals but won't be listed"
+        }[v.consent];
+        const refLabel = ref.consent === "named" ? `${ref.name} (${ref.country})` : "a colleague's lab";
         const code = Math.random().toString(36).slice(2, 7).toUpperCase();
         const link = `https://atlas.example.org/join?ref=${code}`;
         const copy = html`<button type="button">Copy</button>`;
         copy.onclick = () => navigator.clipboard?.writeText(link).then(() => (copy.textContent = "Copied"));
         message.replaceChildren(html`<div class="survey-thanks">
-          <p><b>Thank you!</b> ${record.displayName} is now in the atlas. Scroll up to see ${country} on the <a href="#atlas-map">vendor map</a> and your lab in the <a href="#atlas-network">referral network</a>.</p>
-          <p>You arrived through a link from <b>${ref.displayName}</b> (${ref.country}), so you are <b>${record.degree} ${record.degree === 1 ? "hop" : "hops"}</b> from the Association board.</p>
+          <p><b>Thank you!</b> ${appearAs}. Scroll up to see ${country} on the <a href="#atlas-coverage">coverage map</a> and your lab in the <a href="#atlas-network">referral network</a>.</p>
+          <p>You arrived through a link from <b>${refLabel}</b>, so you are <b>${record.degree} ${record.degree === 1 ? "hop" : "hops"}</b> from the Association board.</p>
           <div class="survey-ref"><span>Your referral link</span><code>${link}</code>${copy}</div>
           <p style="margin-bottom:6px">Forward it to a colleague at another institution. Every lab they bring in becomes part of your branch.</p>
           <div class="survey-share"><button type="button" disabled title="Not wired up in the prototype">Email a colleague</button><button type="button" disabled title="Not wired up in the prototype">Share on LinkedIn</button></div>

@@ -15,6 +15,7 @@ An open, crowdsourced world map of which laboratory information system (LIS) eve
 - **Six degrees of the survey:** the referral network from the Association board outward; hover a lab to trace its chain.
 - **Coverage:** countries with no responses yet, ranked by population, as the call to action for regional ambassadors.
 - **Rollout:** responses and countries over time across the pilot, LinkedIn wave, and ambassador phases.
+- **Privacy rules:** each lab picks a consent level in the survey (named, unnamed, or totals only), and the public view hides anything based on fewer than 5 labs. A **Show as** switch compares the public view with the raw staff view.
 - **Survey (demo):** the 2–3 minute survey. Submitting adds your lab to every chart in the page for that browser session; nothing is sent anywhere.
 
 ## The notebook
