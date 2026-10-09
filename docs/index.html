@@ -117,7 +117,12 @@
     **Main reason for switching**
   </script>
   <script type="module">
-    reasonsChart(filtered)
+    html`<div>
+      ${breakdownChart(filtered, "reason", "Reason")}
+      <p style="margin-top: 1.5rem"><b>Who drives the decision</b></p>
+      ${breakdownChart(filtered, "decider", "Decided by")}
+      ${decisionNote(filtered)}
+    </div>`
   </script>
   <script type="text/markdown">
     ## Upcoming go-lives
@@ -205,6 +210,7 @@
       "New vendor": planShown(d) ? d.newVendor ?? "" : "—",
       "Go-live": planShown(d) ? (d.goLive ? quarterLabel(d.goLive) : "") : "—",
       Reason: planShown(d) ? d.reason ?? "" : "—",
+      "Decided by": planShown(d) ? d.decider ?? "" : "—",
       Hops: d.degree,
       ...(publicView ? {} : {Consent: CONSENT_LABELS[d.consent], "Plans public": d.newVendor ? (d.plansPublic ? "Yes" : "Not yet") : ""})
     })), {rows: 14, layout: "auto"})
@@ -219,7 +225,7 @@
     - **Named** (${d3.format(",")(consentCounts.get("named") ?? 0)} labs): name shown with systems and announced plans.
     - **Unnamed** (${d3.format(",")(consentCounts.get("unnamed") ?? 0)} labs): systems and plans shown as, say, "a community hospital in Germany". Where a country has fewer than ${MIN_CELL} responding labs, only the region is given.
     - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} labs): counted in maps, charts, and totals, but never listed individually.
-    - **Plans:** a listed lab's new vendor, go-live date, and reason appear only once the lab says they're announced or under contract. "Evaluating" is only ever counted in totals.
+    - **Plans:** a listed lab's new vendor, go-live date, reason, and decision-maker appear only once the lab says they're announced or under contract. "Evaluating" is only ever counted in totals.
     - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} labs is hidden. Map areas are hatched, and counts read "fewer than ${MIN_CELL}". ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
 
     Switch **Show as** to *Staff view* at the top of the page to see the raw data these rules protect. In the live atlas, that view would sit behind a staff login.
@@ -270,6 +276,9 @@
     const STATUSES = ["Stable", "Evaluating", "Selected", "Implementing"];
     const TYPES = ["Academic medical center", "Community hospital", "Reference / commercial lab", "Public health lab", "Independent pathology practice"];
     const REASONS = ["Enterprise EHR consolidation", "Vendor end-of-life / sunset", "Health-system merger or acquisition", "Digital pathology & AI readiness", "Total cost of ownership", "Usability & workflow", "Regulatory & interoperability"];
+    const CONSOLIDATION_REASONS = ["Enterprise EHR consolidation", "Health-system merger or acquisition"];
+    const DECIDERS = ["Lab or pathology leadership", "Joint lab and IT committee", "Health-system IT or executives", "Followed the EHR decision", "Parent organization after a merger"];
+    const LAB_AT_TABLE = ["Lab or pathology leadership", "Joint lab and IT committee"];
     const REGIONS = ["North America", "Europe", "Middle East", "Asia-Pacific", "Latin America", "Africa"];
     const REGION_EXTENT = {
       "North America": [[-168, 14], [-52, 72]],
@@ -474,6 +483,11 @@
     const PROPENSITY = {"Sirius Cybernetics": 0.25, "Whirlwind Medical": 1.6, "Deep Thought Computer": 1.35, "Bespoke (in-house)": 1.5, "Magrathea Labs": 1.15, "Cassandra Health": 1.2, "Vineyard Software": 0.9};
     const TYPE_MIX = {"Academic medical center": 30, "Community hospital": 34, "Reference / commercial lab": 14, "Public health lab": 8, "Independent pathology practice": 14};
     const REASONS_TO_SIRIUS = {"Enterprise EHR consolidation": 52, "Health-system merger or acquisition": 16, "Vendor end-of-life / sunset": 10, "Digital pathology & AI readiness": 8, "Usability & workflow": 8, "Total cost of ownership": 3, "Regulatory & interoperability": 3};
+    const DECIDER_MIX = {
+      "Enterprise EHR consolidation": {"Followed the EHR decision": 55, "Health-system IT or executives": 33, "Joint lab and IT committee": 10, "Lab or pathology leadership": 2},
+      "Health-system merger or acquisition": {"Parent organization after a merger": 58, "Health-system IT or executives": 30, "Joint lab and IT committee": 12},
+      other: {"Lab or pathology leadership": 42, "Joint lab and IT committee": 36, "Health-system IT or executives": 22}
+    };
     const REASONS_OTHER = {"Vendor end-of-life / sunset": 25, "Digital pathology & AI readiness": 19, "Total cost of ownership": 17, "Usability & workflow": 15, "Regulatory & interoperability": 12, "Health-system merger or acquisition": 8, "Enterprise EHR consolidation": 4};
     const BOARD_QUOTA = {"840": 8, "124": 2, "826": 2, "276": 1, "528": 1, "036": 1, "724": 1, "682": 1, "250": 1};
     const REACH = {us: "core", ca: "core", uk: "core", dach: "core", south: "core", nordic: "core", anz: "core", gulf: "mid", east: "mid", za: "mid", eastasia: "far", southasia: "far", latam: "far", africa: "far"};
@@ -514,9 +528,10 @@
       const random = d3.randomLcg(20261007);
       const consentRandom = d3.randomLcg(1729);
       const announceRandom = d3.randomLcg(4242);
-      const pick = (weights) => {
+      const decideRandom = d3.randomLcg(8128);
+      const pick = (weights, rng = random) => {
         const entries = Object.entries(weights);
-        let r = random() * d3.sum(entries, ([, w]) => w);
+        let r = rng() * d3.sum(entries, ([, w]) => w);
         for (const [key, w] of entries) if ((r -= w) < 0) return key;
         return entries[entries.length - 1][0];
       };
@@ -566,6 +581,7 @@
             goLive = utc(year, quarter * 3 - 2, 1);
           }
           const reason = switching ? pick(newVendor === "Sirius Cybernetics" ? REASONS_TO_SIRIUS : REASONS_OTHER) : null;
+          const decider = reason ? pick(DECIDER_MIX[reason] ?? DECIDER_MIX.other, decideRandom) : null;
           const previous = !switching && random() < (cp === "Sirius Cybernetics" ? 0.34 : 0.07)
             ? {vendor: pickExcept(PROFILES[profile], cp), date: between(utc(2021, 6, 1), utc(2026, 9, 1))}
             : null;
@@ -577,7 +593,7 @@
             name,
             consent: showName ? "named" : consentRandom() < 0.6 ? "unnamed" : "aggregate",
             plansPublic: committed && announceRandom() < (status === "Implementing" ? 0.85 : 0.5),
-            country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, previous, board
+            country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, decider, previous, board
           });
         }
       }
@@ -865,12 +881,12 @@
     }
   </script>
   <script type="module">
-    function reasonsChart(rows) {
-      const movers = rows.filter((d) => d.reason);
+    function breakdownChart(rows, key, title) {
+      const movers = rows.filter((d) => d[key]);
       if (!movers.length) return emptyNote();
-      const data = d3.rollups(movers, (v) => v.length, (d) => d.reason)
-        .map(([reason, n]) => ({reason, n, hidden: suppressed(n)}))
-        .sort((a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.reason, b.reason));
+      const data = d3.rollups(movers, (v) => v.length, (d) => d[key])
+        .map(([label, n]) => ({label, n, hidden: suppressed(n)}))
+        .sort((a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.label, b.label));
       return Plot.plot({
         width: Math.min(W, 640),
         height: data.length * 28 + 16,
@@ -880,13 +896,23 @@
         marginBottom: 8,
         style: PLOT_STYLE,
         x: {axis: null},
-        y: {domain: data.map((d) => d.reason), label: null, tickSize: 0},
+        y: {domain: data.map((d) => d.label), label: null, tickSize: 0},
         marks: [
-          Plot.barX(data.filter((d) => !d.hidden), {x: "n", y: "reason", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {Reason: "reason"}}),
-          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "reason", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${d.n} · ${pct(d.n, movers.length)}`), dx: 6, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
+          Plot.barX(data.filter((d) => !d.hidden), {x: "n", y: "label", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {[title]: "label"}}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "label", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${d.n} · ${pct(d.n, movers.length)}`), dx: 6, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
           Plot.ruleX([0], {stroke: AXIS})
         ]
       });
+    }
+
+    // Consolidation versus everything else: how often the lab wasn't part of the decision.
+    function decisionNote(rows) {
+      const movers = rows.filter((d) => d.decider);
+      const share = (v) => ({n: v.length, outside: v.filter((d) => !LAB_AT_TABLE.includes(d.decider)).length});
+      const consolidation = share(movers.filter((d) => CONSOLIDATION_REASONS.includes(d.reason)));
+      const rest = share(movers.filter((d) => !CONSOLIDATION_REASONS.includes(d.reason)));
+      if (consolidation.n < MIN_CELL || rest.n < MIN_CELL) return "";
+      return html`<p class="viz-note">When consolidation (EHR or merger) drove the move, ${pct(consolidation.outside, consolidation.n)} of decisions were made without lab leadership at the table. For every other reason, ${pct(rest.outside, rest.n)} were.</p>`;
     }
   </script>
   <script type="module">
@@ -1170,13 +1196,14 @@
         goLive: Inputs.select([2026, 2027, 2028, 2029, 2030], {label: "Go-live year", value: 2027, format: String}),
         announced: Inputs.radio(["yes", "no"], {label: "Are these plans public?", format: (k) => (k === "yes" ? "Yes: announced or under contract" : "Not yet: count them in totals only"), value: "yes"}),
         reason: Inputs.select(REASONS, {label: "Main reason"}),
+        decider: Inputs.select(DECIDERS, {label: "Who decides"}),
         consent: Inputs.radio(CONSENT_LEVELS, {label: "How to show us", format: (k) => CONSENT_CHOICES[k], value: "named"})
       };
       const form = Inputs.form(inputs, {
         template: (i) => html`<div>
           <div class="survey-step"><span class="step-n">1</span><div><h4>Your lab</h4>${i.institution}${i.country}${i.type}</div></div>
           <div class="survey-step"><span class="step-n">2</span><div><h4>Current LIS for each discipline</h4>${i.ap}${i.cp}${i.micro}${i.bb}</div></div>
-          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}</div></div>
+          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}${i.decider}</div></div>
           <div class="survey-step"><span class="step-n">4</span><div><h4>Visibility</h4>${i.consent}</div></div>
         </div>`
       });
@@ -1184,7 +1211,7 @@
         const s = inputs.status.value;
         const committed = s === "Selected" || s === "Implementing";
         inputs.newVendor.style.display = inputs.goLive.style.display = inputs.announced.style.display = committed ? "" : "none";
-        inputs.reason.style.display = s === "Stable" ? "none" : "";
+        inputs.reason.style.display = inputs.decider.style.display = s === "Stable" ? "none" : "";
       };
       // Keep keystrokes in the form from re-running the charts; only Submit does that.
       form.addEventListener("input", (event) => {
@@ -1226,6 +1253,7 @@
           newVendor: committed ? v.newVendor : null,
           goLive: committed ? utc(v.goLive, v.goLive === 2026 ? 10 : 4, 1) : null,
           reason: v.status === "Stable" ? null : v.reason,
+          decider: v.status === "Stable" ? null : v.decider,
           previous: null,
           board: false,
           wave: "Ambassadors",

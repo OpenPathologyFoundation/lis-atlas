@@ -10,7 +10,7 @@ An open, crowdsourced world map of which laboratory information system (LIS) eve
 ## What's in it
 
 - **Who runs what:** world map of the most common LIS per country, small maps of where each major vendor is strongest, and the installed base, filterable by discipline (AP, CP, microbiology, blood bank), region, and institution type.
-- **Who's switching:** a Sankey from current LIS to new LIS, plus the main reasons for switching.
+- **Who's switching:** a Sankey from current LIS to new LIS, plus the main reasons for switching and who drives the decision.
 - **Upcoming go-lives:** one dot per lab by quarter through 2030, and vendor share over time projected from scheduled go-lives.
 - **Six degrees of the survey:** the referral network from the Association board outward; hover a lab to trace its chain.
 - **Coverage:** countries with no responses yet, ranked by population, as the call to action for regional ambassadors.
