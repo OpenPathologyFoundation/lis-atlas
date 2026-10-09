@@ -1,0 +1,13 @@
+{
+  "name": "lis-atlas",
+  "private": true,
+  "description": "Global LIS Atlas: an open, crowdsourced map of which laboratory information system every lab runs (prototype).",
+  "type": "module",
+  "scripts": {
+    "preview": "notebooks preview --root docs",
+    "build": "notebooks build --root docs -- docs/*.html"
+  },
+  "dependencies": {
+    "@observablehq/notebook-kit": "^2.6.6"
+  }
+}

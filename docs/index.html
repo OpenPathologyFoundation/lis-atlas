@@ -1,0 +1,1146 @@
+<!doctype html>
+<notebook theme="air">
+  <title>Global LIS Atlas (prototype)</title>
+  <script type="text/markdown">
+    # Global LIS Atlas
+
+    **An open, crowdsourced world map of which laboratory information system every lab runs, who's switching, to what, and when.** Published live on Observable and backed by the Association.
+
+    <div class="proto-banner"><b>Prototype.</b> Every institution, vendor, response, and number on this page is synthetic. It shows how the atlas could look about ten weeks after launch, with data as of October 7, 2026. You can try the survey at the bottom of the page and see your lab appear.</div>
+
+    Source on GitHub: [OpenPathologyFoundation/lis-atlas](https://github.com/OpenPathologyFoundation/lis-atlas) · Live page: [openpathologyfoundation.github.io/lis-atlas](https://openpathologyfoundation.github.io/lis-atlas/) · Observable notebook: [@gershkovich/global-lis-atlas](https://observablehq.com/@gershkovich/global-lis-atlas)
+  </script>
+  <script type="text/html">
+    <style>
+      .proto-banner { margin: 1rem 0 0.5rem; padding: 0.7rem 1rem; max-width: 760px; border-radius: 8px; background: #fff6e6; border: 1px solid #f1d9a6; color: #4d3500; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+      .atlas-filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 28px; padding: 10px 0 4px; border-bottom: 1px solid #e1e0d9; margin-bottom: 14px; }
+      .atlas-filters form { margin: 0; }
+      .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; max-width: 1100px; }
+      .kpi { padding: 14px 16px; border-radius: 10px; background: #fcfcfb; border: 1px solid rgba(11, 11, 11, 0.1); }
+      .kpi-label { font: 600 11.5px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; color: #52514e; text-transform: uppercase; letter-spacing: 0.05em; }
+      .kpi-value { font: 600 30px/1.15 system-ui, -apple-system, "Segoe UI", sans-serif; color: #0b0b0b; margin-top: 6px; }
+      .kpi-note { font: 13px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; color: #6f6e69; margin-top: 3px; }
+      .viz-wrap { position: relative; max-width: 100%; }
+      .viz-tip { position: absolute; z-index: 5; pointer-events: none; opacity: 0; transition: opacity 80ms; min-width: 150px; max-width: 300px; padding: 8px 10px; border-radius: 8px; background: #fcfcfb; border: 1px solid rgba(11, 11, 11, 0.12); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); font: 12.5px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #52514e; }
+      .viz-tip .tip-title { color: #0b0b0b; font-weight: 600; margin-bottom: 4px; }
+      .viz-tip .tip-row { display: flex; align-items: center; gap: 6px; }
+      .viz-tip .tip-row b { color: #0b0b0b; font-weight: 600; }
+      .viz-tip .tip-key { display: inline-block; width: 12px; height: 2px; border-radius: 1px; }
+      .swatches { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 12.5px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #52514e; margin: 6px 0 8px; }
+      .swatches span { display: inline-flex; align-items: center; gap: 6px; }
+      .swatches i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; }
+      .row-2 { display: flex; flex-wrap: wrap; gap: 20px 40px; align-items: flex-start; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; max-width: 1100px; }
+      .chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 5px 10px; border-radius: 999px; border: 1px dashed #b9b7ae; background: #fcfcfb; font: 13px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; color: #0b0b0b; }
+      .chip small { color: #6f6e69; font-size: 12px; }
+      .leaders { margin: 4px 0 0; padding: 0; list-style: none; font: 13.5px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #0b0b0b; }
+      .leaders li { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #efeee9; }
+      .leaders li b { min-width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; }
+      .leaders li span { color: #6f6e69; }
+      .empty-note { color: #6f6e69; font-style: italic; }
+      .survey { max-width: 760px; padding: 18px 20px; border-radius: 12px; border: 1px solid rgba(11, 11, 11, 0.12); background: #fcfcfb; }
+      .survey-step { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid #efeee9; }
+      .survey-step:last-child { border-bottom: none; }
+      .survey-step h4 { margin: 2px 0 6px; font: 600 14px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; color: #0b0b0b; }
+      .step-n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #2a78d6; color: white; font: 600 12px/1 system-ui, sans-serif; }
+      .survey-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 12px; }
+      .survey-submit { padding: 9px 18px; border-radius: 8px; border: none; background: #2a78d6; color: white; font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
+      .survey-submit:hover { background: #256abf; }
+      .survey-time { color: #6f6e69; font: 13px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; }
+      .survey-error { color: #b42318; }
+      .survey-thanks { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #eef5fd; border: 1px solid #cde2fb; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #0b0b0b; }
+      .survey-thanks p { margin: 0 0 8px; }
+      .survey-ref { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+      .survey-ref code { padding: 4px 8px; border-radius: 6px; background: white; border: 1px solid #cde2fb; font-size: 13px; }
+      .survey-ref button, .survey-share button { padding: 5px 10px; border-radius: 6px; border: 1px solid #b7d3f6; background: white; color: #184f95; font: 600 12.5px/1 system-ui, sans-serif; cursor: pointer; }
+      .survey-share { display: flex; gap: 8px; flex-wrap: wrap; }
+      .survey-share button:disabled { opacity: 0.55; cursor: not-allowed; }
+      /* Collapses code-only cells on the GitHub Pages build. Leave this rule out on observablehq.com: it breaks Observable's cell sizing and cuts off the end of the notebook. */
+      .observablehq--cell:empty { display: none; }
+    </style>
+  </script>
+  <script type="module">
+    const disciplineInput = Inputs.radio(DISCIPLINES, {label: "Discipline", format: (d) => d.label, value: DISCIPLINES[0]});
+    const regionInput = Inputs.select(["All regions", ...REGIONS], {label: "Region"});
+    const typeInput = Inputs.select(["All institution types", ...TYPES], {label: "Institution type"});
+    display(html`<div class="atlas-filters">${disciplineInput}${regionInput}${typeInput}</div>`);
+    const discipline = Generators.input(disciplineInput);
+    const region = Generators.input(regionInput);
+    const instType = Generators.input(typeInput);
+  </script>
+  <script type="module">
+    html`<div class="kpis">
+      ${kpi("Labs responding", d3.format(",")(summary.n), `from ${summary.countries} countries`)}
+      ${kpi("Countries covered", `${summary.countries} of 195`, `${195 - summary.countries} still blank`)}
+      ${kpi("Changing LIS", pct(summary.switching, summary.n), `${summary.switching} evaluating, selected, or implementing`)}
+      ${kpi("Go-lives scheduled", summary.upcoming, "Q4 2026 through 2030")}
+      ${kpi("Picking Sirius Cybernetics", pct(summary.toSirius, summary.committed), `of ${summary.committed} labs that chose a vendor`)}
+    </div>`
+  </script>
+  <script type="text/markdown">
+    <a id="atlas-map"></a>
+
+    ## Who runs what
+
+    Each country is colored by the most common ${discipline.label.toLowerCase()} LIS among responding labs. Blue, orange, and green mark the three largest vendors; gray groups everyone else. Hover a country for its top two systems. The small maps further down show where each major vendor is strongest.
+  </script>
+  <script type="module">
+    vendorMap(filtered, discipline.key, region)
+  </script>
+  <script type="text/markdown">
+    **Installed base among responding labs, ${discipline.label.toLowerCase()}**
+  </script>
+  <script type="module">
+    installedBase(filtered, discipline.key)
+  </script>
+  <script type="text/markdown">
+    **Where each vendor is strongest.** Share of responding labs in each country that run the vendor for ${discipline.label.toLowerCase()}.
+  </script>
+  <script type="module">
+    vendorSmallMultiples(filtered, discipline.key, region)
+  </script>
+  <script type="text/markdown">
+    ## Who's switching, and to what
+
+    ${summary.switching} labs (${pct(summary.switching, summary.n)}) are evaluating, have selected, or are implementing a new LIS. Read the flow left to right: the ${discipline.label.toLowerCase()} system they run today, then the system they are moving to. Labs still evaluating have not picked a vendor yet.
+  </script>
+  <script type="module">
+    migrationSankey(filtered, discipline.key)
+  </script>
+  <script type="text/markdown">
+    **Main reason for switching**
+  </script>
+  <script type="module">
+    reasonsChart(filtered)
+  </script>
+  <script type="text/markdown">
+    ## Upcoming go-lives
+
+    Every dot is one lab, placed in the quarter it plans to go live. ${summary.upcoming} go-lives are scheduled between now and 2030, and ${pct(summary.toSirius, summary.committed)} of them are moving to Sirius Cybernetics. Hover a dot for the lab and its move.
+  </script>
+  <script type="module">
+    goLiveTimeline(filtered, discipline.key)
+  </script>
+  <script type="text/markdown">
+    **Share of responding labs on the three largest vendors.** Solid lines cover past switches; dashed lines project forward from scheduled go-lives. The remaining labs run other systems.
+  </script>
+  <script type="module">
+    shareOverTime(filtered, discipline.key)
+  </script>
+  <script type="text/markdown">
+    <a id="atlas-network"></a>
+
+    ## Six degrees of the survey
+
+    Each response arrives through someone's referral link, so the atlas also records how the survey spread. The Association sits at the center, linked to the ${board.length} board members who seeded the survey (dark dots with a ring). Every lab links to the colleague who invited it, and bigger dots brought in more labs. Hover a lab to trace its chain back to the board.
+
+    The median lab is **${networkStats.median} hops** from the board, the longest chain has **${networkStats.max} hops**, and **${pct(networkStats.withinSix, networkStats.n)}** of labs are within six degrees.
+  </script>
+  <script type="module">
+    referralNetwork(networkLayout, new Set(filtered.map((d) => d.id)))
+  </script>
+  <script type="module">
+    html`<div class="row-2">
+      <div><b>How far the survey traveled</b>${degreeHistogram(filtered)}</div>
+      <div style="min-width: 280px; max-width: 460px; flex: 1;"><b>Top connectors</b> <span style="color:#6f6e69">(labs referred)</span>${topConnectors(filtered)}</div>
+    </div>`
+  </script>
+  <script type="text/markdown">
+    ## Where the map is still blank
+
+    Coverage drives the call to action. Each blank country needs a regional ambassador, and countries with only a handful of responses need a second push. ${blankSpots.length ? "The most populous blank countries are listed below the map." : ""}
+  </script>
+  <script type="module">
+    coverageMap(filtered, region)
+  </script>
+  <script type="module">
+    blankSpots.length
+      ? html`<div><b>Ambassador wanted</b> <span style="color:#6f6e69">(most populous countries with no responses yet; population in millions)</span>
+          <div class="chips" style="margin-top: 8px;">${blankSpots.map((d) => html`<span class="chip">${d.name}${d.pop ? html`<small>${d.pop}M</small>` : ""}</span>`)}</div></div>`
+      : html`<p class="empty-note">Every country in this view has at least one response.</p>`
+  </script>
+  <script type="text/markdown">
+    ## Rollout
+
+    1. **Pilot (Aug 3–24).** Association board and active members fill it in first, fix confusing questions, and seed the map so it isn't empty at launch.
+    2. **LinkedIn wave (Aug 25 – Sep 14).** Leadership posts, members reshare, and everyone tags colleagues at other institutions.
+    3. **Ambassadors (Sep 15 onward).** Regional ambassadors take ownership of their countries, and the blank areas on the map become the call to action.
+  </script>
+  <script type="module">
+    html`<div class="row-2">${rolloutCurve(filtered, "responses")}${rolloutCurve(filtered, "countries")}</div>`
+  </script>
+  <script type="text/markdown">
+    <a id="atlas-survey"></a>
+
+    ## Take the survey (demo)
+
+    This is the 2–3 minute survey. Submitting adds your lab to the charts above for this browser session only; nothing is sent anywhere.
+  </script>
+  <script type="module">
+    const submissions = view(surveyForm());
+  </script>
+  <script type="text/markdown">
+    ## The data
+
+    Every response the atlas shows, as a searchable table. Labs that chose not to be named appear as their type and country.
+  </script>
+  <script type="module">
+    Inputs.table(filtered.map((d) => ({
+      Institution: d.displayName,
+      Country: d.country,
+      Type: d.type,
+      AP: d.lis.ap,
+      CP: d.lis.cp,
+      Micro: d.lis.micro,
+      "Blood bank": d.lis.bb,
+      Status: d.status,
+      "New vendor": d.newVendor ?? "",
+      "Go-live": d.goLive ? quarterLabel(d.goLive) : "",
+      Reason: d.reason ?? "",
+      Hops: d.degree
+    })), {rows: 14, layout: "auto"})
+  </script>
+  <script type="text/markdown">
+    ## From prototype to live
+
+    - **Survey.** Any form tool that exports CSV or has an API works (REDCap, Qualtrics, Google Forms). The referral link is a URL parameter (`?ref=CODE`) stored with each response.
+    - **Data.** A scheduled data loader pulls the responses, removes names for labs that opted out, and publishes one cleaned CSV. The charts on this page read that file instead of the synthetic generator built into this notebook.
+    - **Governance.** The Association owns the dataset. A small editorial group reviews new vendors and merges duplicates, and an open license lets members reuse the data.
+  </script>
+  <script type="module">
+    const VENDORS = ["Sirius Cybernetics", "Cassandra Health", "Magrathea Labs", "Babel Fish Health", "Labyrinth Clinical", "Heart of Gold Medical", "Deep Thought Computer", "Whirlwind Medical", "Vineyard Software", "Other commercial", "Bespoke (in-house)"];
+    const TRACKED = ["Sirius Cybernetics", "Cassandra Health", "Magrathea Labs"];
+    const OTHER = "All other vendors";
+    const GROUPS = [...TRACKED, OTHER];
+    const GROUP_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#a9a79f"];
+    const BLANK = "#e9e8e3";
+    const UNDECIDED = "Undecided (evaluating)";
+    const UNDECIDED_COLOR = "#d6d4cc";
+    const DEGREE_COLORS = ["#0d366b", "#184f95", "#256abf", "#3987e5", "#86b6ef"];
+    const DEGREE_LABELS = ["Board", "1–2 hops", "3–4 hops", "5–6 hops", "7+ hops"];
+    const degreeBin = (k) => (k === 0 ? 0 : k <= 2 ? 1 : k <= 4 ? 2 : k <= 6 ? 3 : 4);
+    const SHARE_RAMP = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"];
+    const MULTIPLE_VENDORS = ["Sirius Cybernetics", "Cassandra Health", "Magrathea Labs", "Babel Fish Health", "Labyrinth Clinical", "Heart of Gold Medical"];
+    const COVERAGE_BINS = ["No responses yet", "1–4", "5–14", "15–49", "50+"];
+    const COVERAGE_COLORS = [BLANK, "#86b6ef", "#3987e5", "#184f95", "#0d366b"];
+    const INK = "#0b0b0b";
+    const INK2 = "#52514e";
+    const MUTED = "#898781";
+    const GRID = "#e1e0d9";
+    const AXIS = "#c3c2b7";
+    const SURFACE = "#fcfcfb";
+    const PLOT_STYLE = {fontSize: "12px", fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", color: INK2, background: "transparent"};
+    const DISCIPLINES = [
+      {key: "cp", label: "Clinical pathology"},
+      {key: "ap", label: "Anatomic pathology"},
+      {key: "micro", label: "Microbiology"},
+      {key: "bb", label: "Blood bank"}
+    ];
+    const STATUSES = ["Stable", "Evaluating", "Selected", "Implementing"];
+    const TYPES = ["Academic medical center", "Community hospital", "Reference / commercial lab", "Public health lab", "Independent pathology practice"];
+    const REASONS = ["Enterprise EHR consolidation", "Vendor end-of-life / sunset", "Health-system merger or acquisition", "Digital pathology & AI readiness", "Total cost of ownership", "Usability & workflow", "Regulatory & interoperability"];
+    const REGIONS = ["North America", "Europe", "Middle East", "Asia-Pacific", "Latin America", "Africa"];
+    const REGION_EXTENT = {
+      "North America": [[-168, 14], [-52, 72]],
+      "Europe": [[-25, 35], [42, 71]],
+      "Middle East": [[25, 12], [62, 43]],
+      "Asia-Pacific": [[66, -47], [178, 50]],
+      "Latin America": [[-118, -56], [-34, 33]],
+      "Africa": [[-18, -36], [52, 38]]
+    };
+    const utc = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
+    const TODAY = utc(2026, 10, 7);
+    const PHASES = [
+      {name: "Pilot", start: utc(2026, 8, 3), end: utc(2026, 8, 25)},
+      {name: "LinkedIn wave", start: utc(2026, 8, 25), end: utc(2026, 9, 15)},
+      {name: "Ambassadors", start: utc(2026, 9, 15), end: utc(2026, 10, 8)}
+    ];
+  </script>
+  <script type="module">
+    const vendorGroup = (v) => (TRACKED.includes(v) ? v : OTHER);
+    const vendorColor = (v) => (v === UNDECIDED ? UNDECIDED_COLOR : GROUP_COLORS[GROUPS.indexOf(vendorGroup(v))]);
+    const pct = (a, b) => (b ? d3.format(".0%")(a / b) : "—");
+    const quarterLabel = (date) => `Q${Math.floor(date.getUTCMonth() / 3) + 1} ${date.getUTCFullYear()}`;
+
+    function kpi(label, value, note) {
+      return html`<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-note">${note}</div></div>`;
+    }
+
+    function emptyNote() {
+      return html`<p class="empty-note">No responses match these filters yet.</p>`;
+    }
+
+    // A shared hover card for the D3 charts. Labels are set with textContent.
+    function tooltip(container) {
+      const tip = document.createElement("div");
+      tip.className = "viz-tip";
+      container.append(tip);
+      return {
+        show(event, title, rows = []) {
+          const titleEl = document.createElement("div");
+          titleEl.className = "tip-title";
+          titleEl.textContent = title;
+          tip.replaceChildren(titleEl, ...rows.map(([value, label, color]) => {
+            const row = document.createElement("div");
+            row.className = "tip-row";
+            if (color) {
+              const key = document.createElement("span");
+              key.className = "tip-key";
+              key.style.background = color;
+              row.append(key);
+            }
+            const strong = document.createElement("b");
+            strong.textContent = value;
+            row.append(strong, document.createTextNode(` ${label}`));
+            return row;
+          }));
+          const box = container.getBoundingClientRect();
+          const x = event.clientX - box.left;
+          const y = event.clientY - box.top;
+          const flip = x > box.width - 320;
+          tip.style.left = `${flip ? x - 14 - tip.offsetWidth : x + 14}px`;
+          tip.style.top = `${Math.max(0, y - 10)}px`;
+          tip.style.opacity = 1;
+        },
+        hide() {
+          tip.style.opacity = 0;
+        }
+      };
+    }
+
+    function projectionFor(region) {
+      const extent = REGION_EXTENT[region];
+      if (!extent) return {type: "equal-earth", domain: land};
+      const [[x0, y0], [x1, y1]] = extent;
+      return {type: "equal-earth", domain: {type: "MultiPoint", coordinates: [[x0, y0], [x1, y0], [x0, y1], [x1, y1], [(x0 + x1) / 2, y0], [(x0 + x1) / 2, y1]]}, inset: 4};
+    }
+
+    function regionOf(feature) {
+      const known = COUNTRY_BY_ID.get(feature.id);
+      if (known) return known.region;
+      const [lon, lat] = d3.geoCentroid(feature);
+      for (const region of ["Middle East", "Europe", "Africa", "North America", "Latin America", "Asia-Pacific"]) {
+        const [[x0, y0], [x1, y1]] = REGION_EXTENT[region];
+        if (lon >= x0 && lon <= x1 && lat >= y0 && lat <= y1) return region;
+      }
+      return lat > 45 ? "Europe" : "Asia-Pacific";
+    }
+  </script>
+  <script type="module">
+    const W = Math.min(width, 1100);
+    const mapWidth = (region) => (region === "Latin America" || region === "Africa" ? Math.min(W, 620) : W);
+  </script>
+  <script type="module">
+    const world = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json").then((response) => response.json());
+  </script>
+  <script type="module">
+    const countryFeatures = topojson.feature(world, world.objects.countries).features
+      .filter((f) => f.properties.name !== "Antarctica")
+      .sort((a, b) => d3.ascending(a.properties.name, b.properties.name));
+    const land = {type: "FeatureCollection", features: countryFeatures};
+    const borders = topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
+  </script>
+  <script type="module">
+    // [ISO numeric id, name, region, synthetic responses, vendor profile]
+    const COUNTRIES = [
+      ["840", "United States", "North America", 190, "us"],
+      ["124", "Canada", "North America", 34, "ca"],
+      ["484", "Mexico", "Latin America", 7, "latam"],
+      ["826", "United Kingdom", "Europe", 40, "uk"],
+      ["372", "Ireland", "Europe", 6, "uk"],
+      ["276", "Germany", "Europe", 28, "dach"],
+      ["040", "Austria", "Europe", 6, "dach"],
+      ["756", "Switzerland", "Europe", 8, "dach"],
+      ["250", "France", "Europe", 18, "south"],
+      ["056", "Belgium", "Europe", 7, "south"],
+      ["380", "Italy", "Europe", 14, "south"],
+      ["724", "Spain", "Europe", 14, "south"],
+      ["620", "Portugal", "Europe", 5, "south"],
+      ["528", "Netherlands", "Europe", 14, "nordic"],
+      ["208", "Denmark", "Europe", 6, "nordic"],
+      ["752", "Sweden", "Europe", 8, "nordic"],
+      ["578", "Norway", "Europe", 5, "nordic"],
+      ["246", "Finland", "Europe", 5, "nordic"],
+      ["616", "Poland", "Europe", 6, "east"],
+      ["203", "Czechia", "Europe", 4, "east"],
+      ["300", "Greece", "Europe", 3, "east"],
+      ["682", "Saudi Arabia", "Middle East", 10, "gulf"],
+      ["784", "United Arab Emirates", "Middle East", 8, "gulf"],
+      ["634", "Qatar", "Middle East", 3, "gulf"],
+      ["376", "Israel", "Middle East", 6, "east"],
+      ["792", "Turkey", "Middle East", 5, "east"],
+      ["036", "Australia", "Asia-Pacific", 20, "anz"],
+      ["554", "New Zealand", "Asia-Pacific", 6, "anz"],
+      ["392", "Japan", "Asia-Pacific", 10, "eastasia"],
+      ["410", "South Korea", "Asia-Pacific", 8, "eastasia"],
+      ["158", "Taiwan", "Asia-Pacific", 4, "eastasia"],
+      ["156", "China", "Asia-Pacific", 6, "eastasia"],
+      ["356", "India", "Asia-Pacific", 12, "southasia"],
+      ["608", "Philippines", "Asia-Pacific", 3, "southasia"],
+      ["458", "Malaysia", "Asia-Pacific", 3, "southasia"],
+      ["764", "Thailand", "Asia-Pacific", 3, "southasia"],
+      ["076", "Brazil", "Latin America", 12, "latam"],
+      ["032", "Argentina", "Latin America", 5, "latam"],
+      ["152", "Chile", "Latin America", 4, "latam"],
+      ["170", "Colombia", "Latin America", 4, "latam"],
+      ["604", "Peru", "Latin America", 2, "latam"],
+      ["710", "South Africa", "Africa", 7, "za"],
+      ["404", "Kenya", "Africa", 2, "africa"],
+      ["288", "Ghana", "Africa", 1, "africa"],
+      ["646", "Rwanda", "Africa", 1, "africa"]
+    ];
+    const COUNTRY_BY_ID = new Map(COUNTRIES.map(([id, name, region]) => [id, {id, name, region}]));
+
+    // Relative weights for the LIS a lab runs today, by market.
+    const PROFILES = {
+      us: {"Sirius Cybernetics": 34, "Cassandra Health": 17, "Magrathea Labs": 18, "Deep Thought Computer": 9, "Whirlwind Medical": 9, "Vineyard Software": 7, "Other commercial": 3, "Bespoke (in-house)": 3},
+      ca: {"Sirius Cybernetics": 28, "Cassandra Health": 26, "Deep Thought Computer": 18, "Magrathea Labs": 10, "Whirlwind Medical": 12, "Other commercial": 6},
+      uk: {"Magrathea Labs": 44, "Babel Fish Health": 20, "Sirius Cybernetics": 10, "Cassandra Health": 10, "Other commercial": 12, "Bespoke (in-house)": 4},
+      dach: {"Heart of Gold Medical": 32, "Labyrinth Clinical": 24, "Magrathea Labs": 10, "Other commercial": 24, "Bespoke (in-house)": 10},
+      south: {"Labyrinth Clinical": 34, "Magrathea Labs": 16, "Other commercial": 34, "Bespoke (in-house)": 16},
+      nordic: {"Sirius Cybernetics": 40, "Magrathea Labs": 14, "Cassandra Health": 4, "Other commercial": 30, "Bespoke (in-house)": 12},
+      east: {"Other commercial": 46, "Labyrinth Clinical": 14, "Heart of Gold Medical": 14, "Bespoke (in-house)": 26},
+      gulf: {"Cassandra Health": 42, "Sirius Cybernetics": 20, "Babel Fish Health": 14, "Other commercial": 24},
+      anz: {"Babel Fish Health": 30, "Other commercial": 30, "Cassandra Health": 14, "Sirius Cybernetics": 10, "Magrathea Labs": 16},
+      eastasia: {"Other commercial": 60, "Bespoke (in-house)": 40},
+      southasia: {"Other commercial": 50, "Bespoke (in-house)": 30, "Cassandra Health": 10, "Babel Fish Health": 10},
+      latam: {"Other commercial": 46, "Deep Thought Computer": 14, "Labyrinth Clinical": 10, "Bespoke (in-house)": 30},
+      za: {"Babel Fish Health": 45, "Other commercial": 30, "Magrathea Labs": 10, "Bespoke (in-house)": 15},
+      africa: {"Other commercial": 40, "Bespoke (in-house)": 45, "Babel Fish Health": 15}
+    };
+    const AP_PROFILES = {
+      us: {"Cassandra Health": 30, "Sirius Cybernetics": 25, "Other commercial": 30, "Magrathea Labs": 10, "Bespoke (in-house)": 5},
+      ca: {"Cassandra Health": 30, "Sirius Cybernetics": 25, "Other commercial": 30, "Deep Thought Computer": 15}
+    };
+    // Where labs that have picked a new vendor are going, by market.
+    const TARGETS = {
+      us: {"Sirius Cybernetics": 72, "Cassandra Health": 7, "Magrathea Labs": 9, "Other commercial": 12},
+      ca: {"Sirius Cybernetics": 62, "Cassandra Health": 18, "Magrathea Labs": 8, "Other commercial": 12},
+      uk: {"Sirius Cybernetics": 30, "Magrathea Labs": 34, "Babel Fish Health": 22, "Other commercial": 14},
+      dach: {"Labyrinth Clinical": 32, "Heart of Gold Medical": 28, "Sirius Cybernetics": 12, "Magrathea Labs": 10, "Other commercial": 18},
+      south: {"Labyrinth Clinical": 40, "Magrathea Labs": 28, "Sirius Cybernetics": 6, "Other commercial": 26},
+      nordic: {"Sirius Cybernetics": 64, "Magrathea Labs": 16, "Other commercial": 20},
+      east: {"Labyrinth Clinical": 30, "Heart of Gold Medical": 20, "Magrathea Labs": 15, "Other commercial": 35},
+      gulf: {"Sirius Cybernetics": 56, "Cassandra Health": 20, "Babel Fish Health": 12, "Other commercial": 12},
+      anz: {"Sirius Cybernetics": 38, "Babel Fish Health": 24, "Magrathea Labs": 20, "Other commercial": 18},
+      eastasia: {"Other commercial": 70, "Cassandra Health": 10, "Sirius Cybernetics": 10, "Babel Fish Health": 10},
+      southasia: {"Other commercial": 45, "Cassandra Health": 20, "Babel Fish Health": 25, "Sirius Cybernetics": 10},
+      latam: {"Other commercial": 40, "Deep Thought Computer": 20, "Labyrinth Clinical": 20, "Sirius Cybernetics": 10, "Cassandra Health": 10},
+      za: {"Babel Fish Health": 45, "Magrathea Labs": 25, "Other commercial": 30},
+      africa: {"Babel Fish Health": 40, "Other commercial": 45, "Magrathea Labs": 15}
+    };
+    const PROPENSITY = {"Sirius Cybernetics": 0.25, "Whirlwind Medical": 1.6, "Deep Thought Computer": 1.35, "Bespoke (in-house)": 1.5, "Magrathea Labs": 1.15, "Cassandra Health": 1.2, "Vineyard Software": 0.9};
+    const TYPE_MIX = {"Academic medical center": 30, "Community hospital": 34, "Reference / commercial lab": 14, "Public health lab": 8, "Independent pathology practice": 14};
+    const REASONS_TO_SIRIUS = {"Enterprise EHR consolidation": 52, "Health-system merger or acquisition": 16, "Vendor end-of-life / sunset": 10, "Digital pathology & AI readiness": 8, "Usability & workflow": 8, "Total cost of ownership": 3, "Regulatory & interoperability": 3};
+    const REASONS_OTHER = {"Vendor end-of-life / sunset": 25, "Digital pathology & AI readiness": 19, "Total cost of ownership": 17, "Usability & workflow": 15, "Regulatory & interoperability": 12, "Health-system merger or acquisition": 8, "Enterprise EHR consolidation": 4};
+    const BOARD_QUOTA = {"840": 8, "124": 2, "826": 2, "276": 1, "528": 1, "036": 1, "724": 1, "682": 1, "250": 1};
+    const REACH = {us: "core", ca: "core", uk: "core", dach: "core", south: "core", nordic: "core", anz: "core", gulf: "mid", east: "mid", za: "mid", eastasia: "far", southasia: "far", latam: "far", africa: "far"};
+    const WAVE_MIX = {
+      core: {"Pilot": 12, "LinkedIn wave": 58, "Ambassadors": 30},
+      mid: {"Pilot": 4, "LinkedIn wave": 36, "Ambassadors": 60},
+      far: {"LinkedIn wave": 22, "Ambassadors": 78}
+    };
+    // Invented place names, so no real institution is attached to made-up data.
+    const STEMS_A = ["Lark", "Vell", "Quill", "Orren", "Staven", "Merrow", "Tolle", "Bracken", "Halven", "Corva", "Pell", "Wyn", "Thorn", "Elm", "Draven", "Kestrel", "Salt", "Ravel", "Amber", "Bel", "Cairn", "Delm", "Fen", "Gale", "Hollin", "Jessa", "Kell", "Loma", "Mir", "Nor", "Oak", "Penn", "Rook", "Sel", "Tarn", "Umber", "Val", "Wren"];
+    const STEMS_B = ["moor", "port", "field", "vale", "brook", "wind", "shaw", "rill", "ridge", "stead", "quay", "grave", "hall", "ton", "mere", "ford", "haven", "crest", "wick", "ley", "by", "dale", "holm", "gate"];
+    const NAME_PATTERNS = {
+      "Academic medical center": [(p) => `${p} University Hospital`, (p) => `${p} Academic Medical Center`],
+      "Community hospital": [(p) => `${p} General Hospital`, (p) => `${p} Regional Medical Center`, (p) => `${p} Memorial Hospital`],
+      "Reference / commercial lab": [(p) => `${p} Reference Laboratories`, (p) => `${p} Diagnostics`],
+      "Public health lab": [(p) => `${p} Public Health Laboratory`],
+      "Independent pathology practice": [(p) => `${p} Pathology Associates`, (p) => `${p} Pathology Group`]
+    };
+    const hospitalUniversitario = (p) => `Hospital Universitario de ${p}`;
+    const hospitalUniversitario2 = (p) => `Hospital Universitário de ${p}`;
+    const LOCAL_AMC = {
+      "276": (p) => `Universitätsklinikum ${p}`,
+      "040": (p) => `Universitätsklinikum ${p}`,
+      "756": (p) => `Universitätsspital ${p}`,
+      "250": (p) => `CHU de ${p}`,
+      "056": (p) => `UZ ${p}`,
+      "380": (p) => `Azienda Ospedaliera Universitaria di ${p}`,
+      "528": (p) => `${p} UMC`,
+      "724": hospitalUniversitario, "484": hospitalUniversitario, "032": hospitalUniversitario,
+      "152": hospitalUniversitario, "170": hospitalUniversitario, "604": hospitalUniversitario,
+      "076": hospitalUniversitario2, "620": hospitalUniversitario2
+    };
+    // Approximate population (millions), used to rank blank countries.
+    const POP_M = {"360": 280, "586": 241, "566": 229, "050": 173, "643": 144, "231": 127, "818": 113, "180": 109, "704": 100, "364": 90, "834": 68, "104": 54, "800": 49, "729": 49, "012": 46, "368": 46, "004": 42, "504": 38, "804": 37, "024": 37, "860": 36, "508": 34, "887": 34, "524": 31, "450": 30, "120": 29, "384": 29, "862": 28, "408": 26, "562": 26, "466": 23, "854": 23, "760": 23, "144": 22, "894": 21, "398": 20, "642": 19, "218": 18, "686": 18, "148": 18, "706": 18, "116": 17, "716": 17, "348": 10, "112": 9, "688": 7};
+  </script>
+  <script type="module">
+    const seedResponses = (() => {
+      const random = d3.randomLcg(20261007);
+      const pick = (weights) => {
+        const entries = Object.entries(weights);
+        let r = random() * d3.sum(entries, ([, w]) => w);
+        for (const [key, w] of entries) if ((r -= w) < 0) return key;
+        return entries[entries.length - 1][0];
+      };
+      const pickExcept = (weights, except) => {
+        for (let i = 0; i < 12; ++i) {
+          const v = pick(weights);
+          if (v !== except) return v;
+        }
+        return except === "Other commercial" ? "Bespoke (in-house)" : "Other commercial";
+      };
+      const pickWeighted = (array, weight) => {
+        let r = random() * d3.sum(array, weight);
+        for (const x of array) if ((r -= weight(x)) < 0) return x;
+        return array[array.length - 1];
+      };
+      const choice = (array) => array[Math.floor(random() * array.length)];
+      const between = (a, b, skew = 1) => new Date(+a + (b - a) * random() ** skew);
+      const article = (s) => (/^[aeiou]/i.test(s) ? "An" : "A");
+      const used = new Set();
+      const placeName = () => {
+        for (;;) {
+          const p = choice(STEMS_A) + choice(STEMS_B);
+          if (!used.has(p)) return used.add(p), p;
+        }
+      };
+
+      const rows = [];
+      let serial = 0;
+      for (const [countryId, country, region, n, profile] of COUNTRIES) {
+        for (let i = 0; i < n; ++i) {
+          const board = i < (BOARD_QUOTA[countryId] ?? 0);
+          const type = board ? "Academic medical center" : pick(TYPE_MIX);
+          const cp = pick(PROFILES[profile]);
+          const lis = {
+            cp,
+            ap: random() < 0.55 ? cp : pick(AP_PROFILES[profile] ?? PROFILES[profile]),
+            micro: random() < 0.85 ? cp : pick(PROFILES[profile]),
+            bb: random() < 0.6 ? cp : pick(PROFILES[profile])
+          };
+          const switching = random() < Math.min(0.85, 0.36 * (PROPENSITY[cp] ?? 1));
+          const status = switching ? pick({Evaluating: 35, Selected: 22, Implementing: 43}) : "Stable";
+          const committed = status === "Selected" || status === "Implementing";
+          const newVendor = committed ? pickExcept(TARGETS[profile], cp) : null;
+          let goLive = null;
+          if (committed) {
+            const year = +pick(status === "Implementing" ? {2026: 14, 2027: 56, 2028: 30} : {2027: 18, 2028: 47, 2029: 27, 2030: 8});
+            const quarter = year === 2026 ? 4 : 1 + Math.floor(random() * 4);
+            goLive = utc(year, quarter * 3 - 2, 1);
+          }
+          const reason = switching ? pick(newVendor === "Sirius Cybernetics" ? REASONS_TO_SIRIUS : REASONS_OTHER) : null;
+          const previous = !switching && random() < (cp === "Sirius Cybernetics" ? 0.34 : 0.07)
+            ? {vendor: pickExcept(PROFILES[profile], cp), date: between(utc(2021, 6, 1), utc(2026, 9, 1))}
+            : null;
+          const showName = board || random() < 0.68;
+          const place = placeName();
+          const name = type === "Academic medical center" && LOCAL_AMC[countryId] ? LOCAL_AMC[countryId](place) : choice(NAME_PATTERNS[type])(place);
+          rows.push({
+            id: `L${String(++serial).padStart(3, "0")}`,
+            name,
+            showName,
+            displayName: showName ? name : `${article(type)} ${type.toLowerCase()} in ${country}`,
+            country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, previous, board
+          });
+        }
+      }
+
+      // When each lab answered, by rollout phase.
+      for (const d of rows) {
+        if (d.board) {
+          d.wave = "Board";
+          d.submitted = between(utc(2026, 8, 3), utc(2026, 8, 6));
+          continue;
+        }
+        d.wave = pick(WAVE_MIX[REACH[d.profile]]);
+        const phase = PHASES.find((p) => p.name === d.wave);
+        d.submitted = between(d.wave === "Pilot" ? utc(2026, 8, 6) : phase.start, phase.end, d.wave === "LinkedIn wave" ? 1.6 : 1.1);
+      }
+      rows.sort((a, b) => a.submitted - b.submitted);
+
+      // Who referred whom: mostly a colleague in the same country who answered recently (their referral link is fresh),
+      // with a pull toward labs that already referred others.
+      const RICH = 1.2, BOARD_PULL = 0.6, FRESH_DAYS = 10;
+      const boardRows = rows.filter((d) => d.board);
+      for (const d of boardRows) Object.assign(d, {referrer: null, degree: 0, children: 0});
+      const done = [...boardRows];
+      for (const d of rows) {
+        if (d.board) continue;
+        let pool;
+        if (d.wave === "Pilot") {
+          pool = boardRows.filter((b) => b.countryId === d.countryId);
+          if (!pool.length) pool = boardRows;
+        } else {
+          const r = random();
+          pool = r < 0.55 ? done.filter((x) => x.countryId === d.countryId) : r < 0.8 ? done.filter((x) => x.region === d.region) : done;
+          if (!pool.length) pool = done.filter((x) => x.region === d.region);
+          if (!pool.length) pool = done;
+        }
+        const ref = d.wave === "Pilot"
+          ? pickWeighted(pool, (x) => 1 + x.children)
+          : pickWeighted(pool, (x) => (1 + RICH * x.children) * (x.board ? BOARD_PULL : 1) * Math.exp(-(d.submitted - x.submitted) / (FRESH_DAYS * 864e5)));
+        Object.assign(d, {referrer: ref.id, degree: ref.degree + 1, children: 0});
+        ref.children += 1;
+        done.push(d);
+      }
+      return rows;
+    })();
+    const board = seedResponses.filter((d) => d.board);
+  </script>
+  <script type="module">
+    const responses = [...seedResponses, ...submissions];
+    const filtered = responses.filter((d) =>
+      (region === "All regions" || d.region === region) &&
+      (instType === "All institution types" || d.type === instType)
+    );
+  </script>
+  <script type="module">
+    const summary = (() => {
+      const committed = filtered.filter((d) => d.newVendor);
+      return {
+        n: filtered.length,
+        countries: new Set(filtered.map((d) => d.countryId)).size,
+        switching: filtered.filter((d) => d.status !== "Stable").length,
+        committed: committed.length,
+        toSirius: committed.filter((d) => d.newVendor === "Sirius Cybernetics").length,
+        upcoming: committed.filter((d) => d.goLive >= utc(2026, 10, 1)).length
+      };
+    })();
+  </script>
+  <script type="module">
+    function countryStats(rows, disc) {
+      const stats = new Map();
+      for (const [id, list] of d3.group(rows, (d) => d.countryId)) {
+        const counts = d3.rollups(list, (v) => v.length, (d) => d.lis[disc]).sort((a, b) => d3.descending(a[1], b[1]));
+        stats.set(id, {n: list.length, counts, share: (vendor) => (counts.find(([k]) => k === vendor)?.[1] ?? 0) / list.length});
+      }
+      return stats;
+    }
+
+    function vendorMap(rows, disc, region) {
+      const stats = countryStats(rows, disc);
+      const describe = (f, i) => {
+        const s = stats.get(f.id);
+        const c = s.counts[i];
+        return c ? `${c[0]} (${pct(c[1], s.n)})` : "—";
+      };
+      return Plot.plot({
+        width: mapWidth(region),
+        style: PLOT_STYLE,
+        projection: projectionFor(region),
+        color: {type: "ordinal", domain: [...GROUPS, "No responses yet"], range: [...GROUP_COLORS, BLANK], legend: true},
+        marks: [
+          Plot.geo(countryFeatures.filter((f) => !stats.has(f.id)), Plot.centroid({
+            fill: BLANK,
+            tip: {format: {x: false, y: false}},
+            channels: {Country: (f) => f.properties.name, Status: () => "No responses yet"}
+          })),
+          Plot.geo(countryFeatures.filter((f) => stats.has(f.id)), Plot.centroid({
+            fill: (f) => vendorGroup(stats.get(f.id).counts[0][0]),
+            tip: {format: {x: false, y: false, fill: false}},
+            channels: {
+              Country: (f) => f.properties.name,
+              "Labs responding": (f) => stats.get(f.id).n,
+              "Most common": (f) => describe(f, 0),
+              "Runner-up": (f) => describe(f, 1)
+            }
+          })),
+          Plot.geo(borders, {stroke: "white", strokeWidth: 0.6})
+        ]
+      });
+    }
+
+    function vendorSmallMultiples(rows, disc, region) {
+      if (!rows.length) return emptyNote();
+      const stats = countryStats(rows, disc);
+      const covered = countryFeatures.filter((f) => stats.has(f.id));
+      const cols = W >= 720 ? 3 : W >= 440 ? 2 : 1;
+      const gap = 18;
+      const w = Math.floor((W - (cols - 1) * gap) / cols);
+      const color = {type: "linear", domain: [0, 1], interpolate: d3.interpolateRgbBasis(SHARE_RAMP), tickFormat: "%", label: "Share of responding labs in the country"};
+      const maps = MULTIPLE_VENDORS.map((vendor) => html`<div>
+        <div style="font: 600 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; color: ${INK};">${vendor}</div>
+        ${Plot.plot({
+          width: w,
+          style: PLOT_STYLE,
+          projection: projectionFor(region),
+          color,
+          marks: [
+            Plot.geo(land, {fill: BLANK}),
+            Plot.geo(covered, Plot.centroid({
+              fill: (f) => stats.get(f.id).share(vendor),
+              tip: {format: {x: false, y: false, fill: false}},
+              channels: {Country: (f) => f.properties.name, [`On ${vendor}`]: (f) => pct(stats.get(f.id).share(vendor), 1), "Labs responding": (f) => stats.get(f.id).n}
+            })),
+            Plot.geo(borders, {stroke: "white", strokeWidth: 0.4})
+          ]
+        })}
+      </div>`);
+      return html`<div>
+        ${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}
+        <div style="display: grid; grid-template-columns: repeat(${cols}, ${w}px); gap: 10px ${gap}px; margin-top: 6px;">${maps}</div>
+      </div>`;
+    }
+  </script>
+  <script type="module">
+    function installedBase(rows, disc) {
+      if (!rows.length) return emptyNote();
+      const data = d3.rollups(rows, (v) => v.length, (d) => d.lis[disc])
+        .map(([vendor, n]) => ({vendor, n, share: n / rows.length}))
+        .sort((a, b) => d3.descending(a.n, b.n));
+      return Plot.plot({
+        width: Math.min(W, 640),
+        height: data.length * 26 + 16,
+        marginLeft: 150,
+        marginRight: 80,
+        marginTop: 8,
+        marginBottom: 8,
+        style: PLOT_STYLE,
+        x: {axis: null},
+        y: {domain: data.map((d) => d.vendor), label: null, tickSize: 0},
+        color: {domain: GROUPS, range: GROUP_COLORS},
+        marks: [
+          Plot.barX(data, {
+            x: "n", y: "vendor", fill: (d) => vendorGroup(d.vendor), insetTop: 3, insetBottom: 3, rx2: 4,
+            tip: {format: {fill: false, y: false}}, channels: {Vendor: "vendor", Share: (d) => pct(d.n, rows.length)}
+          }),
+          Plot.text(data, {x: "n", y: "vendor", text: (d) => `${d.n} · ${pct(d.n, rows.length)}`, dx: 6, textAnchor: "start", fill: INK2}),
+          Plot.ruleX([0], {stroke: AXIS})
+        ]
+      });
+    }
+  </script>
+  <script type="module">
+    import {sankey as d3Sankey} from "npm:d3-sankey";
+  </script>
+  <script type="module">
+    function migrationSankey(rows, disc) {
+      const movers = rows.filter((d) => d.status !== "Stable");
+      if (!movers.length) return emptyNote();
+      const flows = d3.rollups(movers, (v) => v.length, (d) => d.lis[disc], (d) => d.newVendor ?? UNDECIDED);
+      const links = flows.flatMap(([from, tos]) => tos.map(([to, value]) => ({source: `from:${from}`, target: `to:${to}`, value})));
+      const ids = [...new Set(links.flatMap((l) => [l.source, l.target]))];
+      const nodes = ids.map((id) => ({id, name: id.slice(id.indexOf(":") + 1), side: id.startsWith("from:") ? "from" : "to"}));
+      const tallest = Math.max(...["from", "to"].map((side) => nodes.filter((n) => n.side === side).length));
+      const w = W;
+      const h = Math.max(340, tallest * 40 + 28);
+      const marginL = 170;
+      const marginR = 200;
+      const graph = d3Sankey()
+        .nodeId((d) => d.id)
+        .nodeWidth(12)
+        .nodePadding(14)
+        .nodeSort((a, b) => (a.name === UNDECIDED) - (b.name === UNDECIDED) || b.value - a.value)
+        .extent([[marginL, 28], [w - marginR, h - 8]])({nodes, links});
+
+      const wrap = html`<div class="viz-wrap"></div>`;
+      const tip = tooltip(wrap);
+      const svg = d3.create("svg").attr("width", w).attr("height", h).attr("viewBox", [0, 0, w, h]).style("max-width", "100%").style("height", "auto").style("font", "12.5px system-ui, -apple-system, 'Segoe UI', sans-serif");
+      const path = d3.linkHorizontal().source((d) => [d.source.x1, d.y0]).target((d) => [d.target.x0, d.y1]);
+      const link = svg.append("g").attr("fill", "none").selectAll("path").data(graph.links).join("path")
+        .attr("d", path)
+        .attr("stroke", (d) => vendorColor(d.target.name))
+        .attr("stroke-opacity", 0.45)
+        .attr("stroke-width", (d) => Math.max(1.5, d.width))
+        .on("pointermove", function (event, d) {
+          link.attr("stroke-opacity", (l) => (l === d ? 0.85 : 0.18));
+          tip.show(event, `${d.source.name} → ${d.target.name}`, [[`${d.value}`, d.value === 1 ? "lab" : "labs", vendorColor(d.target.name)], [pct(d.value, d.source.value), `of labs leaving ${d.source.name}`]]);
+        })
+        .on("pointerleave", () => {
+          link.attr("stroke-opacity", 0.45);
+          tip.hide();
+        });
+      svg.append("g").selectAll("rect").data(graph.nodes).join("rect")
+        .attr("x", (d) => d.x0)
+        .attr("y", (d) => d.y0)
+        .attr("width", (d) => d.x1 - d.x0)
+        .attr("height", (d) => Math.max(1, d.y1 - d.y0))
+        .attr("rx", 2)
+        .attr("fill", (d) => vendorColor(d.name));
+      const label = svg.append("g").selectAll("text").data(graph.nodes).join("text")
+        .attr("x", (d) => (d.side === "from" ? d.x0 - 8 : d.x1 + 8))
+        .attr("y", (d) => (d.y0 + d.y1) / 2)
+        .attr("dy", "0.35em")
+        .attr("text-anchor", (d) => (d.side === "from" ? "end" : "start"));
+      label.append("tspan").attr("fill", INK).text((d) => d.name);
+      label.append("tspan").attr("fill", MUTED).text((d) => `  ${d.value}`);
+      svg.append("g").attr("fill", INK2).style("font-weight", 600).style("letter-spacing", "0.05em").selectAll("text")
+        .data([["RUNS TODAY", marginL, "start"], ["MOVING TO", w - marginR, "end"]]).join("text")
+        .attr("x", (d) => d[1]).attr("y", 12).attr("text-anchor", (d) => d[2]).text((d) => d[0]);
+      wrap.append(svg.node());
+      return wrap;
+    }
+  </script>
+  <script type="module">
+    function reasonsChart(rows) {
+      const movers = rows.filter((d) => d.reason);
+      if (!movers.length) return emptyNote();
+      const data = d3.rollups(movers, (v) => v.length, (d) => d.reason).map(([reason, n]) => ({reason, n})).sort((a, b) => d3.descending(a.n, b.n));
+      return Plot.plot({
+        width: Math.min(W, 640),
+        height: data.length * 28 + 16,
+        marginLeft: 230,
+        marginRight: 80,
+        marginTop: 8,
+        marginBottom: 8,
+        style: PLOT_STYLE,
+        x: {axis: null},
+        y: {domain: data.map((d) => d.reason), label: null, tickSize: 0},
+        marks: [
+          Plot.barX(data, {x: "n", y: "reason", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {Reason: "reason"}}),
+          Plot.text(data, {x: "n", y: "reason", text: (d) => `${d.n} · ${pct(d.n, movers.length)}`, dx: 6, textAnchor: "start", fill: INK2}),
+          Plot.ruleX([0], {stroke: AXIS})
+        ]
+      });
+    }
+  </script>
+  <script type="module">
+    function goLiveTimeline(rows, disc) {
+      const live = rows
+        .filter((d) => d.goLive && d.goLive >= utc(2026, 10, 1))
+        .map((d) => ({...d, x: new Date(+d.goLive + 45 * 864e5), group: vendorGroup(d.newVendor), from: d.lis[disc], quarter: quarterLabel(d.goLive)}));
+      if (!live.length) return emptyNote();
+      const tallest = d3.max(d3.rollup(live, (v) => v.length, (d) => +d.goLive).values());
+      const step = 11;
+      return Plot.plot({
+        width: W,
+        height: step * (tallest + 0.6) + 66,
+        marginTop: 16,
+        marginBottom: 30,
+        style: PLOT_STYLE,
+        x: {type: "utc", domain: [utc(2026, 10, 1), utc(2031, 1, 1)], label: null, ticks: d3.utcYear.every(1), tickFormat: "%Y", tickSize: 0},
+        y: {axis: null, domain: [0, tallest + 0.6]},
+        color: {domain: GROUPS, range: GROUP_COLORS, legend: true},
+        marks: [
+          Plot.ruleX(d3.utcYears(utc(2027, 1, 1), utc(2031, 1, 1)), {stroke: GRID}),
+          Plot.ruleY([0], {stroke: AXIS}),
+          Plot.dot(live, Plot.stackY2({
+            x: "x", fill: "group", order: GROUPS, r: 4.5, stroke: SURFACE, strokeWidth: 1,
+            tip: {format: {x: false, y: false, fill: false}},
+            channels: {Lab: "displayName", Country: "country", From: "from", To: "newVendor", "Go-live": "quarter", Status: "status"}
+          }))
+        ]
+      });
+    }
+  </script>
+  <script type="module">
+    function shareOverTime(rows, disc) {
+      if (!rows.length) return emptyNote();
+      const vendorAt = (d, date) => {
+        if (d.goLive && d.goLive <= date) return d.newVendor;
+        if (d.previous && date < d.previous.date) return d.previous.vendor;
+        return d.lis[disc];
+      };
+      const dates = [...d3.range(2021, 2026).map((y) => utc(y, 12, 31)), TODAY, ...d3.range(2026, 2031).map((y) => utc(y, 12, 31))];
+      const data = dates.flatMap((date) => {
+        const counts = d3.rollup(rows, (v) => v.length, (d) => vendorGroup(vendorAt(d, date)));
+        return TRACKED.map((group) => ({date, group, share: (counts.get(group) ?? 0) / rows.length}));
+      });
+      const past = data.filter((d) => d.date <= TODAY);
+      const future = data.filter((d) => d.date >= TODAY);
+      const wide = dates.map((date) => ({date, rows: data.filter((d) => +d.date === +date).sort((a, b) => b.share - a.share)}));
+      const yMax = Math.min(1, d3.max(data, (d) => d.share) * 1.1);
+      const height = 340;
+      // Nudge end labels apart so they never overlap.
+      const ends = future.filter((d) => +d.date === +dates[dates.length - 1]).sort((a, b) => b.share - a.share);
+      const minGap = (14 / (height - 50)) * yMax;
+      ends.forEach((d, i) => (d.labelY = i ? Math.min(d.share, ends[i - 1].labelY - minGap) : d.share));
+      return Plot.plot({
+        width: W,
+        height,
+        marginRight: 170,
+        marginTop: 24,
+        style: PLOT_STYLE,
+        x: {type: "utc", label: null, ticks: d3.utcYear.every(1), tickFormat: "%Y"},
+        y: {domain: [0, yMax], grid: true, tickFormat: "%", label: "Share of responding labs", labelArrow: "none"},
+        color: {domain: TRACKED, range: GROUP_COLORS.slice(0, 3), legend: true},
+        marks: [
+          Plot.ruleX([TODAY], {stroke: MUTED, strokeDasharray: "2,3"}),
+          Plot.text([TODAY], {x: (d) => d, frameAnchor: "top", dy: -14, dx: 6, textAnchor: "start", text: () => "Today; projected from scheduled go-lives →", fill: INK2}),
+          Plot.line(past, {x: "date", y: "share", stroke: "group", strokeWidth: 2, curve: "monotone-x"}),
+          Plot.line(future, {x: "date", y: "share", stroke: "group", strokeWidth: 2, strokeDasharray: "5,4", curve: "monotone-x"}),
+          Plot.dot(ends, {x: "date", y: "share", fill: "group", r: 4, stroke: SURFACE, strokeWidth: 2}),
+          Plot.text(ends, {x: "date", y: "labelY", text: (d) => `${d.group} ${pct(d.share, 1)}`, dx: 10, textAnchor: "start", fill: INK}),
+          Plot.ruleX(wide, Plot.pointerX({x: "date", stroke: AXIS})),
+          Plot.tip(wide, Plot.pointerX({
+            x: "date", y: () => yMax, anchor: "top-left",
+            title: (d) => [`${d.date > TODAY ? "Projected, end of " : d.date < TODAY ? "End of " : "Today, "}${d.date.getUTCFullYear()}`, ...d.rows.map((r) => `${pct(r.share, 1)}  ${r.group}`)].join("\n")
+          }))
+        ]
+      });
+    }
+  </script>
+  <script type="module">
+    const networkLayout = (() => {
+      const children = d3.rollup(responses, (v) => v.length, (d) => d.referrer);
+      const hub = {id: "ASSOC", d: null, children: board.length, r: 9};
+      const nodes = [hub, ...responses.map((d) => ({id: d.id, d, children: children.get(d.id) ?? 0, r: 2.4 + Math.sqrt(children.get(d.id) ?? 0) * 1.5}))];
+      const links = [
+        ...board.map((b) => ({source: "ASSOC", target: b.id, hub: true})),
+        ...responses.filter((d) => d.referrer).map((d) => ({source: d.referrer, target: d.id}))
+      ];
+      const simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id((d) => d.id).distance((l) => (l.hub ? 34 : 9)).strength((l) => (l.hub ? 0.6 : 1)))
+        .force("charge", d3.forceManyBody().strength(-12))
+        .force("x", d3.forceX().strength(0.03))
+        .force("y", d3.forceY().strength(0.045))
+        .force("collide", d3.forceCollide((d) => d.r + 0.8))
+        .stop();
+      for (let i = 0; i < 360; ++i) simulation.tick();
+      return {nodes, links, byId: new Map(nodes.map((n) => [n.id, n]))};
+    })();
+    const networkStats = (() => {
+      const degrees = filtered.map((d) => d.degree);
+      return {n: degrees.length, median: d3.median(degrees) ?? 0, max: d3.max(degrees) ?? 0, withinSix: degrees.filter((k) => k <= 6).length};
+    })();
+  </script>
+  <script type="module">
+    function referralNetwork({nodes, links, byId}, visible) {
+      const w = W;
+      const h = Math.round(Math.min(640, Math.max(420, w * 0.6)));
+      const [x0, x1] = d3.extent(nodes, (n) => n.x);
+      const [y0, y1] = d3.extent(nodes, (n) => n.y);
+      const k = Math.min((w - 60) / (x1 - x0 || 1), (h - 60) / (y1 - y0 || 1));
+      const sx = (x) => w / 2 + (x - (x0 + x1) / 2) * k;
+      const sy = (y) => h / 2 + (y - (y0 + y1) / 2) * k;
+      const rOf = (n) => Math.max(2.2, n.r * Math.min(k, 1.6));
+      const isVisible = (n) => !n.d || visible.has(n.id);
+      const fillOf = (n) => (n.d ? DEGREE_COLORS[degreeBin(n.d.degree)] : INK);
+      const chainOf = (n) => {
+        const chain = [];
+        for (let cur = n; cur; cur = cur.d?.referrer ? byId.get(cur.d.referrer) : cur.d ? byId.get("ASSOC") : null) chain.push(cur);
+        return chain;
+      };
+
+      const wrap = html`<div class="viz-wrap"></div>`;
+      const tip = tooltip(wrap);
+      const svg = d3.create("svg").attr("width", w).attr("height", h).attr("viewBox", [0, 0, w, h]).style("max-width", "100%").style("height", "auto").style("font", "12px system-ui, -apple-system, 'Segoe UI', sans-serif");
+      const link = svg.append("g").attr("stroke", AXIS).attr("stroke-width", 0.8).selectAll("line").data(links).join("line")
+        .attr("x1", (l) => sx(l.source.x)).attr("y1", (l) => sy(l.source.y))
+        .attr("x2", (l) => sx(l.target.x)).attr("y2", (l) => sy(l.target.y))
+        .attr("stroke-opacity", (l) => (visible.has(l.target.id) ? 0.9 : 0.25));
+      const node = svg.append("g").selectAll("circle").data(nodes).join("circle")
+        .attr("cx", (n) => sx(n.x)).attr("cy", (n) => sy(n.y)).attr("r", rOf)
+        .attr("fill", fillOf)
+        .attr("stroke", (n) => (n.d?.board ? INK : SURFACE))
+        .attr("stroke-width", (n) => (n.d?.board ? 1.5 : 0.8))
+        .attr("opacity", (n) => (isVisible(n) ? 1 : 0.15));
+      const hub = byId.get("ASSOC");
+      const labelled = [hub, ...nodes.filter((n) => n.d && visible.has(n.id) && n.d.showName && !n.d.board).sort((a, b) => b.children - a.children).slice(0, 3)];
+      svg.append("g").selectAll("text").data(labelled).join("text")
+        .attr("x", (n) => sx(n.x) + rOf(n) + 4).attr("y", (n) => sy(n.y)).attr("dy", "0.35em")
+        .attr("fill", INK).attr("stroke", SURFACE).attr("stroke-width", 3).attr("paint-order", "stroke")
+        .style("font-weight", (n) => (n.d ? 400 : 700))
+        .text((n) => (n.d ? n.d.name : "The Association"));
+
+      // Nearest-node hover, so small dots are easy to hit.
+      const delaunay = d3.Delaunay.from(nodes, (n) => sx(n.x), (n) => sy(n.y));
+      svg.on("pointermove", (event) => {
+        const [mx, my] = d3.pointer(event);
+        const n = nodes[delaunay.find(mx, my)];
+        if (!n || Math.hypot(sx(n.x) - mx, sy(n.y) - my) > 24) return reset();
+        const chain = chainOf(n);
+        const onChain = new Set(chain.map((c) => c.id));
+        node.attr("opacity", (m) => (onChain.has(m.id) ? 1 : 0.12));
+        link.attr("stroke-opacity", (l) => (onChain.has(l.target.id) && onChain.has(l.source.id) ? 1 : 0.08)).attr("stroke", (l) => (onChain.has(l.target.id) && onChain.has(l.source.id) ? INK : AXIS));
+        if (!n.d) return tip.show(event, "The Association", [[`${board.length}`, "board members seeded the survey"]]);
+        // The referral chain from the board down to this lab, shortened in the middle when long.
+        const steps = chain.slice().reverse().filter((c) => c.d).map((c, i) => [`${i}`, `${c.d.displayName}${c.d.board ? " (board)" : ""}, ${c.d.country}`]);
+        const shown = steps.length > 6 ? [...steps.slice(0, 2), ["…", `${steps.length - 4} more labs`], ...steps.slice(-2)] : steps;
+        tip.show(event, n.d.displayName, [
+          [`${n.d.degree}`, n.d.degree === 1 ? "hop from the board" : "hops from the board", fillOf(n)],
+          [`${n.children}`, n.children === 1 ? "lab referred" : "labs referred"],
+          ...(steps.length > 1 ? [["", "Referral chain:"], ...shown.slice(0, -1)] : [])
+        ]);
+      });
+      const reset = () => {
+        node.attr("opacity", (n) => (isVisible(n) ? 1 : 0.15));
+        link.attr("stroke-opacity", (l) => (visible.has(l.target.id) ? 0.9 : 0.25)).attr("stroke", AXIS);
+        tip.hide();
+      };
+      svg.on("pointerleave", reset);
+      wrap.append(html`<div class="swatches">${DEGREE_LABELS.map((label, i) => html`<span><i style="background:${DEGREE_COLORS[i]}${i === 0 ? `; box-shadow: 0 0 0 1.5px ${INK}` : ""}"></i>${label}</span>`)}</div>`, svg.node());
+      return wrap;
+    }
+
+    function degreeHistogram(rows) {
+      if (!rows.length) return emptyNote();
+      const counts = d3.rollup(rows, (v) => v.length, (d) => d.degree);
+      const data = d3.range(0, d3.max(counts.keys()) + 1).map((k) => ({k, n: counts.get(k) ?? 0}));
+      return Plot.plot({
+        width: Math.min(W, 460),
+        height: 210,
+        marginTop: 20,
+        style: PLOT_STYLE,
+        x: {domain: data.map((d) => d.k), label: "Hops from the board", labelAnchor: "center", labelArrow: "none", tickSize: 0, tickFormat: (k) => (k === 0 ? "Board" : k)},
+        y: {axis: null},
+        marks: [
+          Plot.barY(data, {x: "k", y: "n", fill: (d) => DEGREE_COLORS[degreeBin(d.k)], insetLeft: 1, insetRight: 1, ry2: 3, tip: {format: {fill: false}}, channels: {Labs: "n"}}),
+          Plot.text(data, {x: "k", y: "n", text: (d) => d.n, dy: -8, fill: INK2}),
+          Plot.ruleY([0], {stroke: AXIS})
+        ]
+      });
+    }
+
+    function topConnectors(rows) {
+      const children = d3.rollup(responses, (v) => v.length, (d) => d.referrer);
+      const top = rows.filter((d) => !d.board && children.get(d.id)).sort((a, b) => children.get(b.id) - children.get(a.id)).slice(0, 6);
+      if (!top.length) return emptyNote();
+      return html`<ol class="leaders">${top.map((d) => html`<li><b>${children.get(d.id)}</b><div>${d.displayName}<br><span>${d.country} · ${d.degree} ${d.degree === 1 ? "hop" : "hops"} from the board</span></div></li>`)}</ol>`;
+    }
+  </script>
+  <script type="module">
+    const coverageCounts = d3.rollup(filtered, (v) => v.length, (d) => d.countryId);
+    const blankSpots = countryFeatures
+      .filter((f) => !coverageCounts.has(f.id) && (region === "All regions" || regionOf(f) === region))
+      .map((f) => ({name: f.properties.name, pop: POP_M[f.id] ?? 0}))
+      .sort((a, b) => d3.descending(a.pop, b.pop) || d3.ascending(a.name, b.name))
+      .slice(0, 16);
+
+    function coverageMap(rows, region) {
+      const bin = (n) => (!n ? COVERAGE_BINS[0] : n < 5 ? COVERAGE_BINS[1] : n < 15 ? COVERAGE_BINS[2] : n < 50 ? COVERAGE_BINS[3] : COVERAGE_BINS[4]);
+      return Plot.plot({
+        width: mapWidth(region),
+        style: PLOT_STYLE,
+        projection: projectionFor(region),
+        color: {type: "ordinal", domain: COVERAGE_BINS, range: COVERAGE_COLORS, legend: true},
+        marks: [
+          Plot.geo(countryFeatures, Plot.centroid({
+            fill: (f) => bin(coverageCounts.get(f.id)),
+            tip: {format: {x: false, y: false, fill: false}},
+            channels: {
+              Country: (f) => f.properties.name,
+              Responses: (f) => coverageCounts.get(f.id) ?? 0,
+              Status: (f) => {
+                const n = coverageCounts.get(f.id);
+                return !n ? "Blank: ambassador wanted" : n < 5 ? "Thin: needs a second push" : "Covered";
+              }
+            }
+          })),
+          Plot.geo(borders, {stroke: "white", strokeWidth: 0.6})
+        ]
+      });
+    }
+  </script>
+  <script type="module">
+    function rolloutCurve(rows, metric) {
+      const sorted = rows.slice().sort((a, b) => a.submitted - b.submitted);
+      const days = d3.utcDays(utc(2026, 8, 3), utc(2026, 10, 8));
+      const seen = new Set();
+      let i = 0;
+      const data = days.map((day) => {
+        const end = d3.utcDay.offset(day, 1);
+        while (i < sorted.length && sorted[i].submitted < end) seen.add(sorted[i++].countryId);
+        return {date: day, value: metric === "responses" ? i : seen.size};
+      });
+      const label = metric === "responses" ? "Labs responding" : "Countries covered";
+      const yMax = d3.max(data, (d) => d.value) * 1.12 || 1;
+      return html`<div><b>${label}</b>${Plot.plot({
+        width: Math.min(W / 2 - 20, 540) < 300 ? Math.min(W, 540) : Math.min(W / 2 - 20, 540),
+        height: 250,
+        marginTop: 26,
+        style: PLOT_STYLE,
+        x: {type: "utc", label: null, ticks: d3.utcWeek.every(2), tickFormat: "%b %-d"},
+        y: {domain: [0, yMax], grid: true, label: null},
+        marks: [
+          Plot.rect(PHASES, {x1: "start", x2: "end", fill: (d, i) => (i % 2 ? "#f4f3ef" : "#ecebe6"), fillOpacity: 0.8}),
+          Plot.text(PHASES, {x: (d) => new Date((+d.start + +d.end) / 2), frameAnchor: "top", dy: -16, text: "name", fill: INK2, fontWeight: 600}),
+          Plot.lineY(data, {x: "date", y: "value", stroke: GROUP_COLORS[0], strokeWidth: 2}),
+          Plot.ruleX(data, Plot.pointerX({x: "date", stroke: AXIS})),
+          Plot.dot(data, Plot.pointerX({x: "date", y: "value", fill: GROUP_COLORS[0], r: 4, stroke: SURFACE, strokeWidth: 2})),
+          Plot.tip(data, Plot.pointerX({x: "date", y: "value", title: (d) => `${d.value} ${label.toLowerCase()}\n${d3.utcFormat("%b %-d, %Y")(d.date)}`}))
+        ]
+      })}</div>`;
+    }
+  </script>
+  <script type="module">
+    function surveyForm() {
+      const usa = countryFeatures.find((f) => f.id === "840");
+      const inputs = {
+        institution: Inputs.text({label: "Institution name", placeholder: "e.g., Larkmoor University Hospital", width: 320}),
+        country: Inputs.select(countryFeatures, {label: "Country", format: (f) => f.properties.name, value: usa}),
+        type: Inputs.select(TYPES, {label: "Institution type"}),
+        ap: Inputs.select(VENDORS, {label: "Anatomic pathology", value: "Cassandra Health"}),
+        cp: Inputs.select(VENDORS, {label: "Clinical pathology", value: "Magrathea Labs"}),
+        micro: Inputs.select(VENDORS, {label: "Microbiology", value: "Magrathea Labs"}),
+        bb: Inputs.select(VENDORS, {label: "Blood bank", value: "Magrathea Labs"}),
+        status: Inputs.radio(STATUSES, {label: "Switching status", value: "Implementing"}),
+        newVendor: Inputs.select(VENDORS, {label: "New vendor", value: "Sirius Cybernetics"}),
+        goLive: Inputs.select([2026, 2027, 2028, 2029, 2030], {label: "Go-live year", value: 2027, format: String}),
+        reason: Inputs.select(REASONS, {label: "Main reason"}),
+        showName: Inputs.toggle({label: "OK to show our name", value: true})
+      };
+      const form = Inputs.form(inputs, {
+        template: (i) => html`<div>
+          <div class="survey-step"><span class="step-n">1</span><div><h4>Your lab</h4>${i.institution}${i.country}${i.type}</div></div>
+          <div class="survey-step"><span class="step-n">2</span><div><h4>Current LIS for each discipline</h4>${i.ap}${i.cp}${i.micro}${i.bb}</div></div>
+          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.status}${i.newVendor}${i.goLive}${i.reason}</div></div>
+          <div class="survey-step"><span class="step-n">4</span><div><h4>Visibility</h4>${i.showName}</div></div>
+        </div>`
+      });
+      const sync = () => {
+        const s = inputs.status.value;
+        const committed = s === "Selected" || s === "Implementing";
+        inputs.newVendor.style.display = inputs.goLive.style.display = committed ? "" : "none";
+        inputs.reason.style.display = s === "Stable" ? "none" : "";
+      };
+      // Keep keystrokes in the form from re-running the charts; only Submit does that.
+      form.addEventListener("input", (event) => {
+        sync();
+        event.stopPropagation();
+      });
+      sync();
+
+      const message = html`<div aria-live="polite"></div>`;
+      const button = html`<button class="survey-submit" type="button">Submit response</button>`;
+      const container = html`<div class="survey">${form}<div class="survey-actions">${button}<span class="survey-time">About 2 minutes. Demo only: nothing leaves this page.</span></div>${message}</div>`;
+      container.value = [];
+      button.onclick = () => {
+        const v = form.value;
+        const name = v.institution.trim();
+        if (!name) {
+          message.replaceChildren(html`<p class="survey-error">Please enter your institution's name.</p>`);
+          return;
+        }
+        const f = v.country;
+        const country = COUNTRY_BY_ID.get(f.id)?.name ?? f.properties.name;
+        const committed = v.status === "Selected" || v.status === "Implementing";
+        // Simulate arriving through the busiest referrer nearby: same country, else same region.
+        const nearby = (test) => seedResponses.filter((d) => !d.board && test(d));
+        const local = nearby((d) => d.countryId === f.id);
+        const regional = nearby((d) => d.region === regionOf(f));
+        const ref = d3.greatest(local.length ? local : regional.length ? regional : board, (d) => d.children);
+        const record = {
+          id: `NEW${container.value.length + 1}`,
+          name,
+          showName: v.showName,
+          displayName: v.showName ? name : `${/^[aeiou]/i.test(v.type) ? "An" : "A"} ${v.type.toLowerCase()} in ${country}`,
+          country,
+          countryId: f.id,
+          region: regionOf(f),
+          type: v.type,
+          lis: {ap: v.ap, cp: v.cp, micro: v.micro, bb: v.bb},
+          status: v.status,
+          newVendor: committed ? v.newVendor : null,
+          goLive: committed ? utc(v.goLive, v.goLive === 2026 ? 10 : 4, 1) : null,
+          reason: v.status === "Stable" ? null : v.reason,
+          previous: null,
+          board: false,
+          wave: "Ambassadors",
+          submitted: TODAY,
+          referrer: ref.id,
+          degree: ref.degree + 1,
+          children: 0
+        };
+        container.value = [...container.value, record];
+        container.dispatchEvent(new Event("input", {bubbles: true}));
+        const code = Math.random().toString(36).slice(2, 7).toUpperCase();
+        const link = `https://atlas.example.org/join?ref=${code}`;
+        const copy = html`<button type="button">Copy</button>`;
+        copy.onclick = () => navigator.clipboard?.writeText(link).then(() => (copy.textContent = "Copied"));
+        message.replaceChildren(html`<div class="survey-thanks">
+          <p><b>Thank you!</b> ${record.displayName} is now in the atlas. Scroll up to see ${country} on the <a href="#atlas-map">vendor map</a> and your lab in the <a href="#atlas-network">referral network</a>.</p>
+          <p>You arrived through a link from <b>${ref.displayName}</b> (${ref.country}), so you are <b>${record.degree} ${record.degree === 1 ? "hop" : "hops"}</b> from the Association board.</p>
+          <div class="survey-ref"><span>Your referral link</span><code>${link}</code>${copy}</div>
+          <p style="margin-bottom:6px">Forward it to a colleague at another institution. Every lab they bring in becomes part of your branch.</p>
+          <div class="survey-share"><button type="button" disabled title="Not wired up in the prototype">Email a colleague</button><button type="button" disabled title="Not wired up in the prototype">Share on LinkedIn</button></div>
+        </div>`);
+      };
+      return container;
+    }
+  </script>
+</notebook>
