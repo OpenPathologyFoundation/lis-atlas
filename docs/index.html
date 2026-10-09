@@ -133,7 +133,7 @@
     goLiveTimeline(filtered, discipline.key)
   </script>
   <script type="text/markdown">
-    **Share of responding labs on the three largest vendors.** Solid lines cover past switches; dashed lines project forward from scheduled go-lives. The remaining labs run other systems.
+    **Share of responding labs on the three largest vendors.** Solid lines cover past switches; dashed lines project forward from scheduled go-lives. The remaining labs run other systems. **Illustrative pattern, not a finding:** the synthetic data was built to show one vendor gaining share.
   </script>
   <script type="module">
     shareOverTime(filtered, discipline.key)
@@ -151,7 +151,7 @@
       ${breakdownChart(filtered, "direction", "Direction", DIRECTIONS)}
       <p style="margin-top: 1.5rem"><b>Digital-first labs by in-house informatics team</b></p>
       ${digitalByTeamChart(filtered)}
-      <p class="viz-note">Share of labs in each group that already run primary digital or plan to move to digital-first workflow orchestration.</p>
+      <p class="viz-note">Share of labs in each group that already run primary digital or plan to move to digital-first workflow orchestration. <b>Illustrative pattern, not a finding:</b> the synthetic data was built so that bigger teams lean digital-first.</p>
     </div>`
   </script>
   <script type="text/markdown">
@@ -953,7 +953,7 @@
       const consolidation = share(movers.filter((d) => CONSOLIDATION_REASONS.includes(d.reason)));
       const rest = share(movers.filter((d) => !CONSOLIDATION_REASONS.includes(d.reason)));
       if (consolidation.n < MIN_CELL || rest.n < MIN_CELL) return "";
-      return html`<p class="viz-note">When consolidation (EHR or merger) drove the move, ${pct(consolidation.outside, consolidation.n)} of decisions were made without lab leadership at the table. For every other reason, ${pct(rest.outside, rest.n)} were.</p>`;
+      return html`<p class="viz-note">When consolidation (EHR or merger) drove the move, ${pct(consolidation.outside, consolidation.n)} of decisions were made without lab leadership at the table. For every other reason, ${pct(rest.outside, rest.n)} were. <b>Illustrative pattern, not a finding:</b> the synthetic data was built to show this.</p>`;
     }
 
     function digitalByTeamChart(rows) {
