@@ -6,12 +6,13 @@
 
     **An open, crowdsourced world map of which laboratory information system every lab runs, who's switching, to what, and when.** Published live on Observable and proposed to the Association.
 
-    <div class="proto-banner"><b>Prototype.</b> Every institution, vendor, response, and number on this page is synthetic. It shows how the atlas could look about ten weeks after launch, with data as of October 7, 2026. You can try the survey at the bottom of the page and see your lab appear.</div>
+    <div class="proto-banner"><b>Prototype.</b> Every institution, vendor, response, and number on this page is synthetic. It shows how the atlas could look about ten weeks after launch, with data as of October 7, 2026. <a href="#atlas-survey"><b>Take the survey</b></a> and watch your lab appear.</div>
 
     Source on GitHub: [OpenPathologyFoundation/lis-atlas](https://github.com/OpenPathologyFoundation/lis-atlas) · Live page: [openpathologyfoundation.github.io/lis-atlas](https://openpathologyfoundation.github.io/lis-atlas/) · Observable notebook: [@gershkovich/lis-atlas](https://observablehq.com/@gershkovich/lis-atlas)
   </script>
   <script type="text/html">
     <style>
+      .proto-banner a[href] { text-decoration: underline; }
       .proto-banner { margin: 1rem 0 0.5rem; padding: 0.7rem 1rem; max-width: 760px; border-radius: 8px; background: #fff6e6; border: 1px solid #f1d9a6; color: #4d3500; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
       .atlas-filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 28px; padding: 10px 0 4px; border-bottom: 1px solid #e1e0d9; margin-bottom: 14px; }
       .atlas-filters form { margin: 0; }
@@ -870,8 +871,10 @@
       const tallest = Math.max(...["from", "to"].map((side) => nodes.filter((n) => n.side === side).length));
       const w = W;
       const h = Math.max(340, tallest * 40 + 28);
-      const marginL = 170;
-      const marginR = 200;
+      // On narrow screens the nodes sit at the edges and their labels go inside, over the flows.
+      const narrow = W < 560;
+      const marginL = narrow ? 2 : 170;
+      const marginR = narrow ? 2 : 200;
       const graph = d3Sankey()
         .nodeId((d) => d.id)
         .nodeWidth(12)
@@ -903,13 +906,20 @@
         .attr("height", (d) => Math.max(1, d.y1 - d.y0))
         .attr("rx", 2)
         .attr("fill", (d) => vendorColor(d.name));
-      const label = svg.append("g").selectAll("text").data(graph.nodes).join("text")
-        .attr("x", (d) => (d.side === "from" ? d.x0 - 8 : d.x1 + 8))
+      // Inside labels share a row with the opposite side, so each gets at most half the width (about 7.5px per character).
+      const maxChars = Math.floor((w / 2 - 24) / 7.5);
+      const shortName = (d) => {
+        const name = d.name === UNDECIDED ? "Undecided" : d.name;
+        return name.length > maxChars ? `${name.slice(0, maxChars - 1).trimEnd()}…` : name;
+      };
+      const label = svg.append("g").style("pointer-events", "none").selectAll("text").data(graph.nodes).join("text")
+        .attr("x", (d) => (d.side === "from" ? (narrow ? d.x1 + 6 : d.x0 - 8) : narrow ? d.x0 - 6 : d.x1 + 8))
         .attr("y", (d) => (d.y0 + d.y1) / 2)
         .attr("dy", "0.35em")
-        .attr("text-anchor", (d) => (d.side === "from" ? "end" : "start"));
-      label.append("tspan").attr("fill", INK).text((d) => d.name);
-      label.append("tspan").attr("fill", MUTED).text((d) => `  ${d.value}`);
+        .attr("text-anchor", (d) => ((d.side === "from") === narrow ? "start" : "end"))
+        .attr("stroke", SURFACE).attr("stroke-width", 3).attr("stroke-linejoin", "round").attr("paint-order", "stroke");
+      label.append("tspan").attr("fill", INK).text((d) => (narrow ? shortName(d) : d.name));
+      if (!narrow) label.append("tspan").attr("fill", INK2).text((d) => `  ${d.value}`);
       svg.append("g").attr("fill", INK2).style("font-weight", 600).style("letter-spacing", "0.05em").selectAll("text")
         .data([["RUNS TODAY", marginL, "start"], ["MOVING TO", w - marginR, "end"]]).join("text")
         .attr("x", (d) => d[1]).attr("y", 12).attr("text-anchor", (d) => d[2]).text((d) => d[0]);
@@ -928,19 +938,21 @@
         .sort(order
           ? (a, b) => order.indexOf(a.label) - order.indexOf(b.label)
           : (a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.label, b.label));
+      const narrow = W < 560;
       return Plot.plot({
         width: Math.min(W, 640),
-        height: data.length * 28 + 16,
-        marginLeft: 230,
+        height: data.length * (narrow ? 44 : 28) + 16,
+        marginLeft: narrow ? 0 : 230,
         marginRight: 90,
         marginTop: 8,
         marginBottom: 8,
         style: PLOT_STYLE,
-        x: {axis: null},
-        y: {domain: data.map((d) => d.label), label: null, tickSize: 0},
+        x: {axis: null, domain: [0, d3.max(data, (d) => (d.hidden ? 0 : d.n)) || 1]},
+        y: {domain: data.map((d) => d.label), label: null, tickSize: 0, axis: narrow ? null : "left"},
         marks: [
-          Plot.barX(data.filter((d) => !d.hidden), {x: "n", y: "label", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {[title]: "label"}}),
-          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "label", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${d.n} · ${pct(d.n, movers.length)}`), dx: 6, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
+          narrow ? Plot.text(data, {x: 0, y: "label", text: "label", dy: -11, textAnchor: "start", fill: INK2}) : null,
+          Plot.barX(data.filter((d) => !d.hidden), {x: "n", y: "label", fill: GROUP_COLORS[0], insetTop: narrow ? 20 : 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {[title]: "label"}}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "label", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${d.n} · ${pct(d.n, movers.length)}`), dx: 6, dy: narrow ? 8 : 0, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
           Plot.ruleX([0], {stroke: AXIS})
         ]
       });
@@ -964,19 +976,21 @@
       }).filter((d) => d.total);
       if (!data.length) return emptyNote();
       const teamLabel = (t) => (t === "None" ? "No in-house team" : t === "More than 10" ? "More than 10 people" : t);
+      const narrow = W < 560;
       return Plot.plot({
         width: Math.min(W, 640),
-        height: data.length * 28 + 16,
-        marginLeft: 230,
+        height: data.length * (narrow ? 44 : 28) + 16,
+        marginLeft: narrow ? 0 : 230,
         marginRight: 130,
         marginTop: 8,
         marginBottom: 8,
         style: PLOT_STYLE,
         x: {axis: null, domain: [0, d3.max(data, (d) => (d.hidden ? 0 : d.share)) || 1]},
-        y: {domain: data.map((d) => d.team), label: null, tickSize: 0, tickFormat: teamLabel},
+        y: {domain: data.map((d) => d.team), label: null, tickSize: 0, tickFormat: teamLabel, axis: narrow ? null : "left"},
         marks: [
-          Plot.barX(data.filter((d) => !d.hidden), {x: "share", y: "team", fill: GROUP_COLORS[0], insetTop: 4, insetBottom: 4, rx2: 4, tip: {format: {x: false, y: false}}, channels: {"Informatics team": (d) => teamLabel(d.team), "Digital-first": (d) => `${d.n} of ${d.total} labs`}}),
-          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.share), y: "team", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${pct(d.n, d.total)} of ${d.total} labs`), dx: 6, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
+          narrow ? Plot.text(data, {x: 0, y: "team", text: (d) => teamLabel(d.team), dy: -11, textAnchor: "start", fill: INK2}) : null,
+          Plot.barX(data.filter((d) => !d.hidden), {x: "share", y: "team", fill: GROUP_COLORS[0], insetTop: narrow ? 20 : 4, insetBottom: 4, rx2: 4, tip: {format: {x: false, y: false}}, channels: {"Informatics team": (d) => teamLabel(d.team), "Digital-first": (d) => `${d.n} of ${d.total} labs`}}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.share), y: "team", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${pct(d.n, d.total)} of ${d.total} labs`), dx: 6, dy: narrow ? 8 : 0, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
           Plot.ruleX([0], {stroke: AXIS})
         ]
       });
@@ -1037,19 +1051,19 @@
       return Plot.plot({
         width: W,
         height,
-        marginRight: 170,
+        marginRight: W < 560 ? 50 : 170,
         marginTop: 24,
         style: PLOT_STYLE,
-        x: {type: "utc", label: null, ticks: d3.utcYear.every(1), tickFormat: "%Y"},
-        y: {domain: [0, yMax], grid: true, tickFormat: "%", label: "Share of responding labs", labelArrow: "none"},
+        x: {type: "utc", label: null, ticks: d3.utcYear.every(W < 560 ? 5 : 1), tickFormat: "%Y"},
+        y: {domain: [0, yMax], grid: true, tickFormat: "%", label: W < 560 ? null : "Share of responding labs", labelArrow: "none"},
         color: {domain: TRACKED, range: GROUP_COLORS.slice(0, 3), legend: true},
         marks: [
           Plot.ruleX([TODAY], {stroke: MUTED, strokeDasharray: "2,3"}),
-          Plot.text([TODAY], {x: (d) => d, frameAnchor: "top", dy: -14, dx: 6, textAnchor: "start", text: () => "Today; projected from scheduled go-lives →", fill: INK2}),
+          Plot.text([TODAY], {x: (d) => d, frameAnchor: "top", dy: -14, dx: 6, textAnchor: "start", text: () => (W < 560 ? "Projected →" : "Today; projected from scheduled go-lives →"), fill: INK2}),
           Plot.line(past, {x: "date", y: "share", stroke: "group", strokeWidth: 2, curve: "monotone-x"}),
           Plot.line(future, {x: "date", y: "share", stroke: "group", strokeWidth: 2, strokeDasharray: "5,4", curve: "monotone-x"}),
           Plot.dot(ends, {x: "date", y: "share", fill: "group", r: 4, stroke: SURFACE, strokeWidth: 2}),
-          Plot.text(ends, {x: "date", y: "labelY", text: (d) => `${d.group} ${pct(d.share, 1)}`, dx: 10, textAnchor: "start", fill: INK}),
+          Plot.text(ends, {x: "date", y: "labelY", text: (d) => (W < 560 ? pct(d.share, 1) : `${d.group} ${pct(d.share, 1)}`), dx: 10, textAnchor: "start", fill: INK}),
           Plot.ruleX(wide, Plot.pointerX({x: "date", stroke: AXIS})),
           Plot.tip(wide, Plot.pointerX({
             x: "date", y: () => yMax, anchor: "top-left",
@@ -1115,9 +1129,12 @@
         .attr("stroke-width", (n) => (n.d?.board ? 1.5 : 0.8))
         .attr("opacity", (n) => (isVisible(n) ? 1 : 0.15));
       const hub = byId.get("ASSOC");
-      const labelled = [hub, ...nodes.filter((n) => n.d && visible.has(n.id) && (!publicView || n.d.consent === "named") && !n.d.board).sort((a, b) => b.children - a.children).slice(0, 3)];
+      const labelled = [hub, ...nodes.filter((n) => n.d && visible.has(n.id) && (!publicView || n.d.consent === "named") && !n.d.board).sort((a, b) => b.children - a.children).slice(0, W < 800 ? 0 : 3)];
+      // Put a label on the left of its node when it would run past the right edge (about 6.6px per character at 12px).
+      const fitsRight = (n) => sx(n.x) + rOf(n) + 4 + (n.d ? n.d.name : "The Association").length * 6.6 <= w;
       svg.append("g").selectAll("text").data(labelled).join("text")
-        .attr("x", (n) => sx(n.x) + rOf(n) + 4).attr("y", (n) => sy(n.y)).attr("dy", "0.35em")
+        .attr("x", (n) => (fitsRight(n) ? sx(n.x) + rOf(n) + 4 : sx(n.x) - rOf(n) - 4)).attr("y", (n) => sy(n.y)).attr("dy", "0.35em")
+        .attr("text-anchor", (n) => (fitsRight(n) ? "start" : "end"))
         .attr("fill", INK).attr("stroke", SURFACE).attr("stroke-width", 3).attr("paint-order", "stroke")
         .style("font-weight", (n) => (n.d ? 400 : 700))
         .text((n) => (n.d ? n.d.name : "The Association"));
