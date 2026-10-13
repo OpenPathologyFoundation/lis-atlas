@@ -1,7 +1,7 @@
 {
   "name": "lis-atlas",
   "private": true,
-  "description": "Global LIS Atlas: an open, crowdsourced map of which laboratory information system every lab runs (prototype).",
+  "description": "Global LIS Atlas: an open, crowdsourced map of anatomic pathology LIS, digital pathology, and bespoke informatics tools (prototype).",
   "type": "module",
   "scripts": {
     "preview": "notebooks preview --root docs",

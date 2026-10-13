@@ -1,23 +1,27 @@
 # Global LIS Atlas (prototype)
 
-An open, crowdsourced world map of which laboratory information system (LIS) every lab runs, who's switching, to what, and when.
+An open, crowdsourced world map of anatomic pathology: which AP LIS each operation runs, where it stands with digital pathology, and which bespoke tools its informatics team has built and would share.
 
-> **Prototype.** Every institution, vendor, response, and number is synthetic. The LIS vendors are invented too, borrowed from Greek mythology and *The Hitchhiker's Guide to the Galaxy* (Sirius Cybernetics, Cassandra Health, Magrathea Labs, and friends).
+The unit is the **AP operation**: the group that signs out surgical pathology and cytology for one or more sites (a hospital department, an academic department, a contracted pathology group, or an independent or dermatopathology practice). Each one is counted on its own, never as part of the clinical lab that shares its building.
+
+> **Prototype.** Every institution, vendor, tool, response, and number is synthetic. The LIS vendors are invented too, borrowed from Greek mythology and *The Hitchhiker's Guide to the Galaxy* (Sirius Cybernetics, Cassandra Health, Magrathea Labs, and friends).
 
 **Live page:** https://openpathologyfoundation.github.io/lis-atlas/  
 **Observable notebook:** https://observablehq.com/@gershkovich/lis-atlas
 
 ## What's in it
 
-- **Who runs what:** world map of the most common LIS per country, small maps of where each major vendor is strongest, and the installed base, filterable by discipline (AP, CP, microbiology, blood bank), region, and institution type.
-- **Who's switching:** a Sankey from current LIS to new LIS, plus the main reasons for switching and who drives the decision.
-- **Upcoming go-lives:** one dot per lab by quarter through 2030, and vendor share over time projected from scheduled go-lives.
-- **Where labs are headed:** whether labs plan to keep a traditional LIS, add digital pathology tools, or move to digital-first workflow orchestration, and how that tracks with the size of their in-house informatics team.
-- **Six degrees of the survey:** the referral network from the Association board outward; hover a lab to trace its chain.
+- **Who runs what:** world map of the most common AP LIS per country, small maps of where each major vendor is strongest, and the installed base, filterable by region and operation type.
+- **Where digital pathology stands:** each type of operation by stage (none to primary digital), the share that would be primary digital each year if every stated target holds, the main barriers, how the image system works with the AP LIS, AI in clinical use, and digital sign-out by informatics staffing.
+- **Bespoke technology:** software built by an operation's own informatics team to close gaps the core LIS leaves, what it does, whether the team would share it, and a table of tools on offer.
+- **Who's switching:** a Sankey from current to new AP LIS, plus the main reasons for switching and who drives the decision.
+- **Upcoming go-lives:** one dot per operation by quarter through 2030, and vendor share over time projected from scheduled go-lives.
+- **Hospitals covered in the US:** each operation names the hospitals it signs out for, so coverage is measured against the public CMS hospital list (4,523 hospitals in the 50 states and DC; the only real numbers on the page). A state map of the share covered, coverage by hospital type (acute care, critical access, children's), and coverage over time.
+- **Six degrees of the survey:** the referral network from the Association board outward; hover an operation to trace its chain.
 - **Coverage:** countries with no responses yet, ranked by population, as the call to action for regional ambassadors.
 - **Rollout:** responses and countries over time across the pilot, LinkedIn wave, and ambassador phases.
-- **Privacy rules:** each lab picks a consent level in the survey (named, unnamed, or totals only), and the public view hides anything based on fewer than 5 labs. Switching plans are listed only once a lab says they're announced or under contract; "evaluating," long-term direction, and informatics team size only count in totals. A **Show as** switch compares the public view with the raw staff view.
-- **Survey (demo):** the 2–3 minute survey. Submitting adds your lab to every chart in the page for that browser session; nothing is sent anywhere.
+- **Privacy rules:** each operation picks a consent level in the survey (named, unnamed, or totals only), and the public view hides anything based on fewer than 5 operations. Switching plans are listed only once an operation says they're announced or under contract; "evaluating," digital pathology targets, barriers, and informatics staffing only count in totals. Tool names appear only for operations shown by name that offer to share them. A **Show as** switch compares the public view with the raw staff view.
+- **Survey (demo):** a short version of the 5-minute survey. Submitting adds your operation to the charts for that browser session; nothing is sent anywhere.
 
 ## The notebook
 
@@ -35,5 +39,5 @@ npm run preview
 ## From prototype to live
 
 1. Point the survey (REDCap, Qualtrics, Google Forms, or similar) at a response store, with the referral code carried as a `?ref=CODE` URL parameter.
-2. Replace the synthetic generator cell with a data loader that reads the cleaned responses and hides names for labs that opted out.
+2. Replace the synthetic generator cell with a data loader that reads the cleaned responses and hides names for operations that opted out.
 3. Keep the build on GitHub Actions so the page refreshes on a schedule or whenever the data changes.

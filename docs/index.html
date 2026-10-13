@@ -4,9 +4,11 @@
   <script type="text/markdown">
     # Global LIS Atlas
 
-    **An open, crowdsourced world map of which laboratory information system every lab runs, who's switching, to what, and when.** Published live on Observable and proposed to the Association.
+    **An open, crowdsourced world map of anatomic pathology: which AP LIS each operation runs, where it stands with digital pathology, and which bespoke tools its informatics team has built and would share.** Published live on Observable and proposed to the Association.
 
-    <div class="proto-banner"><b>Prototype.</b> Every institution, vendor, response, and number on this page is synthetic. It shows how the atlas could look about ten weeks after launch, with data as of October 7, 2026. <a href="#atlas-survey"><b>Take the survey</b></a> and watch your lab appear.</div>
+    <div class="proto-banner"><b>Prototype.</b> Every institution, vendor, tool, response, and number on this page is synthetic, except the US hospital totals, which come from the public CMS hospital list. It shows how the atlas could look about ten weeks after launch, with data as of October 7, 2026. <a href="#atlas-survey"><b>Take the survey</b></a> and watch your operation appear.</div>
+
+    The unit is the **AP operation**: the group that signs out surgical pathology and cytology for one or more sites. It may be a hospital department, an academic department, a contracted pathology group, or an independent or dermatopathology practice. Each one is counted on its own, never as part of the clinical lab that shares its building.
 
     Source on GitHub: [OpenPathologyFoundation/lis-atlas](https://github.com/OpenPathologyFoundation/lis-atlas) · Live page: [openpathologyfoundation.github.io/lis-atlas](https://openpathologyfoundation.github.io/lis-atlas/) · Observable notebook: [@gershkovich/lis-atlas](https://observablehq.com/@gershkovich/lis-atlas)
   </script>
@@ -64,24 +66,25 @@
     </style>
   </script>
   <script type="module">
-    const disciplineInput = Inputs.radio(DISCIPLINES, {label: "Discipline", format: (d) => d.label, value: DISCIPLINES[0]});
+    // The atlas covers anatomic pathology only; the charts read each operation's AP LIS.
+    const discipline = {key: "ap", label: "AP LIS"};
     const regionInput = Inputs.select(["All regions", ...REGIONS], {label: "Region"});
-    const typeInput = Inputs.select(["All institution types", ...TYPES], {label: "Institution type"});
+    const typeInput = Inputs.select(["All operation types", ...TYPES], {label: "Operation type"});
     const audienceInput = Inputs.radio(AUDIENCES, {label: "Show as", value: AUDIENCES[0]});
-    display(html`<div class="atlas-filters">${disciplineInput}${regionInput}${typeInput}${audienceInput}</div>`);
-    display(html`<p class="viz-note" style="margin: -6px 0 12px;">The public view hides anything based on fewer than ${MIN_CELL} labs and lists labs only as their consent allows. <a href="#atlas-privacy">How respondents are protected</a></p>`);
-    const discipline = Generators.input(disciplineInput);
+    display(html`<div class="atlas-filters">${regionInput}${typeInput}${audienceInput}</div>`);
+    display(html`<p class="viz-note" style="margin: -6px 0 12px;">The public view hides anything based on fewer than ${MIN_CELL} operations and lists operations only as their consent allows. <a href="#atlas-privacy">How respondents are protected</a></p>`);
     const region = Generators.input(regionInput);
     const instType = Generators.input(typeInput);
     const audience = Generators.input(audienceInput);
   </script>
   <script type="module">
     html`<div class="kpis">
-      ${kpi("Labs responding", fmtCount(summary.n), suppressed(summary.n) ? "too few to show details" : `from ${summary.countries} countries`)}
+      ${kpi("AP operations responding", fmtCount(summary.n), suppressed(summary.n) ? "too few to show details" : `from ${summary.countries} countries`)}
       ${kpi("Countries covered", `${summary.countries} of 195`, `${195 - summary.countries} still blank`)}
-      ${kpi("Changing LIS", pctOf(summary.switching, summary.n), `${fmtCount(summary.switching)} evaluating, selected, or implementing`)}
-      ${kpi("Go-lives scheduled", fmtCount(summary.upcoming), "Q4 2026 through 2030")}
-      ${kpi("Picking Sirius Cybernetics", pctOf(summary.toSirius, summary.committed), `of ${fmtCount(summary.committed)} labs that chose a vendor`)}
+      ${kpi("Signing out digitally", pctOf(summary.dpClinical, summary.n), `${fmtPart(summary.primary, summary.dpClinical)} of them primary digital`)}
+      ${kpi("Running bespoke tools", pctOf(summary.bespoke, summary.n), `${fmtCount(summary.offering)} operations offer to share theirs`)}
+      ${kpi("Changing AP LIS", pctOf(summary.switching, summary.n), `${fmtCount(summary.switching)} evaluating, selected, or implementing`)}
+      ${kpi("US hospitals covered", usCoverage.ops.length && !suppressed(usCoverage.ops.length) ? pct(usCoverage.covered, usCoverage.total) : "—", usCoverage.ops.length && !suppressed(usCoverage.ops.length) ? `${d3.format(",")(usCoverage.covered)} of ${d3.format(",")(usCoverage.total)} hospitals` : "no US responses in this view")}
     </div>`
   </script>
   <script type="text/markdown">
@@ -89,27 +92,81 @@
 
     ## Who runs what
 
-    Each country is colored by the most common ${discipline.label.toLowerCase()} LIS among responding labs. Blue, orange, and green mark the three largest vendors; gray groups everyone else. Hover a country for its top two systems. The small maps further down show where each major vendor is strongest. In the public view, a country is hatched instead of colored when no vendor there has at least ${MIN_CELL} labs, so no single lab's system can be read off the map.
+    Each country is colored by the most common AP LIS among responding operations. Blue, orange, and green mark the three largest vendors; gray groups everyone else. Hover a country for its top two systems. The small maps further down show where each major vendor is strongest. In the public view, a country is hatched instead of colored when no vendor there has at least ${MIN_CELL} operations, so no single operation's system can be read off the map.
   </script>
   <script type="module">
     vendorMap(filtered, discipline.key, region)
   </script>
   <script type="text/markdown">
-    **Installed base among responding labs, ${discipline.label.toLowerCase()}**
+    **Installed base among responding operations.** ${summary.withClinical ? `${pctOf(summary.sameVendor, summary.withClinical)} of operations with a clinical lab at their sites run the same vendor for AP and the clinical lab; the rest run AP on a different vendor's system.` : ""}
   </script>
   <script type="module">
     installedBase(filtered, discipline.key)
   </script>
   <script type="text/markdown">
-    **Where each vendor is strongest.** Share of responding labs in each country that run the vendor for ${discipline.label.toLowerCase()}.
+    **Where each vendor is strongest.** Share of responding operations in each country that run the vendor as their AP LIS.
   </script>
   <script type="module">
     vendorSmallMultiples(filtered, discipline.key, region)
   </script>
   <script type="text/markdown">
+    <a id="atlas-digital"></a>
+
+    ## Where digital pathology stands
+
+    ${fmtCount(summary.dpClinical)} operations (${pctOf(summary.dpClinical, summary.n)}) use digital slides in clinical sign-out, and ${fmtPart(summary.primary, summary.dpClinical)} sign out most cases on screen. The first bar covers all operations; each one after it is a type of operation, so a hospital department and a dermatopathology practice are compared side by side rather than pooled. Hover a segment for its count.
+  </script>
+  <script type="module">
+    dpStatusChart(filtered)
+  </script>
+  <script type="text/markdown">
+    **If every target holds.** The share of operations that would be primary digital each year: those already there, plus every operation whose target year has come. Targets are plans, so they are only ever counted in totals.
+  </script>
+  <script type="module">
+    dpTargetChart(filtered)
+  </script>
+  <script type="module">
+    html`<div>
+      <p><b>Share of surgical cases scanned</b> <span style="color:#6f6e69">(operations using digital slides in sign-out)</span></p>
+      ${breakdownChart(filtered, "scanned", "Cases scanned", SCANNED_SHARES)}
+      <p style="margin-top: 1.5rem"><b>Main barrier to going further</b></p>
+      ${breakdownChart(filtered, "barrier", "Barrier")}
+      <p style="margin-top: 1.5rem"><b>How the image system works with the AP LIS</b> <span style="color:#6f6e69">(operations with an image system)</span></p>
+      ${breakdownChart(filtered, "integration", "Integration", INTEGRATION_LEVELS)}
+      <p style="margin-top: 1.5rem"><b>AI in clinical use</b> <span style="color:#6f6e69">(operations using at least one; several answers allowed)</span></p>
+      ${breakdownChart(filtered, "ai", "AI use")}
+      <p style="margin-top: 1.5rem"><b>Digital sign-out by informatics staffing</b></p>
+      ${teamChart(filtered, (d) => DP_CLINICAL.includes(d.dp), "Digital sign-out")}
+      <p class="viz-note">Share of operations in each staffing band, counting informatics and LIS staff who support AP (pathologists not counted), that use digital slides in clinical sign-out. <b>Illustrative pattern, not a finding:</b> the synthetic data was built so that bigger teams go digital sooner.</p>
+    </div>`
+  </script>
+  <script type="text/markdown">
+    <a id="atlas-bespoke"></a>
+
+    ## Bespoke technology
+
+    Many AP operations run software their own informatics teams built to close gaps the core LIS leaves: case assignment, slide tracking, synoptic reporting, scan routing. We call it **bespoke**, not home-grown. Much of it is enterprise-grade software, built by embedded informatics teams with their own support and release cycles. The atlas asks two simple things: what these tools do, and whether the team would share them.
+
+    ${fmtCount(summary.bespoke)} operations (${pctOf(summary.bespoke, summary.n)}) run bespoke tools in clinical use, and ${fmtCount(summary.developing)} more are building them. ${fmtCount(summary.offering)} would share theirs or already do.
+  </script>
+  <script type="module">
+    html`<div>
+      <p><b>What the tools do</b> <span style="color:#6f6e69">(operations with bespoke tools; several answers allowed)</span></p>
+      ${breakdownChart(filtered, "bespokeAreas", "Area")}
+      <p style="margin-top: 1.5rem"><b>Would they share them?</b></p>
+      ${breakdownChart(filtered, "share", "Would share", SHARE_CHOICES)}
+    </div>`
+  </script>
+  <script type="text/markdown">
+    **Tools on offer.** Tools from operations shown by name that would share them or already do. In the live atlas, each entry would link to a contact or a code repository.
+  </script>
+  <script type="module">
+    toolsOnOffer(filtered)
+  </script>
+  <script type="text/markdown">
     ## Who's switching, and to what
 
-    ${fmtCount(summary.switching)} labs (${pctOf(summary.switching, summary.n)}) are evaluating, have selected, or are implementing a new LIS. Read the flow left to right: the ${discipline.label.toLowerCase()} system they run today, then the system they are moving to. Labs still evaluating have not picked a vendor yet. In the public view, moves made by fewer than ${MIN_CELL} labs are left out.
+    ${fmtCount(summary.switching)} operations (${pctOf(summary.switching, summary.n)}) are evaluating, have selected, or are implementing a new AP LIS. Read the flow left to right: the AP LIS they run today, then the system they are moving to. Operations still evaluating have not picked a vendor yet. In the public view, moves made by fewer than ${MIN_CELL} operations are left out.
   </script>
   <script type="module">
     migrationSankey(filtered, discipline.key)
@@ -128,41 +185,25 @@
   <script type="text/markdown">
     ## Upcoming go-lives
 
-    Every dot is one lab, placed in the quarter it plans to go live. ${fmtCount(summary.upcoming)} go-lives are scheduled between now and 2030, and ${pctOf(summary.toSirius, summary.committed)} of them are moving to Sirius Cybernetics. Hover a dot for the lab and its move. In the public view, the dots show only plans that labs say are announced or under contract, from labs that agreed to be listed.
+    Every dot is one operation, placed in the quarter its new AP LIS goes live. ${fmtCount(summary.upcoming)} go-lives are scheduled between now and 2030, and ${pctOf(summary.toSirius, summary.committed)} of them are moving to Sirius Cybernetics. Hover a dot for the operation and its move. In the public view, the dots show only plans that operations say are announced or under contract, from operations that agreed to be listed.
   </script>
   <script type="module">
     goLiveTimeline(filtered, discipline.key)
   </script>
   <script type="text/markdown">
-    **Share of responding labs on the three largest vendors.** Solid lines cover past switches; dashed lines project forward from scheduled go-lives. The remaining labs run other systems. **Illustrative pattern, not a finding:** the synthetic data was built to show one vendor gaining share.
+    **Share of responding operations on the three largest AP LIS vendors.** Solid lines cover past switches; dashed lines project forward from scheduled go-lives. The remaining operations run other systems. **Illustrative pattern, not a finding:** the synthetic data was built to show one vendor gaining share.
   </script>
   <script type="module">
     shareOverTime(filtered, discipline.key)
-  </script>
-  <script type="text/markdown">
-    <a id="atlas-direction"></a>
-
-    ## Where labs are headed
-
-    Switching vendors is one question. Whether a lab needs a traditional LIS at all is another. Every lab says where it is headed and how many informatics staff it has in house. ${fmtCount(summary.digitalFirst)} labs (${pctOf(summary.digitalFirst, summary.n)}) already run primary digital or plan to move to digital-first workflow orchestration. These two answers are only ever counted in totals.
-  </script>
-  <script type="module">
-    html`<div>
-      <p><b>Long-term direction</b></p>
-      ${breakdownChart(filtered, "direction", "Direction", DIRECTIONS)}
-      <p style="margin-top: 1.5rem"><b>Digital-first labs by in-house informatics team</b></p>
-      ${digitalByTeamChart(filtered)}
-      <p class="viz-note">Share of labs in each group that already run primary digital or plan to move to digital-first workflow orchestration. <b>Illustrative pattern, not a finding:</b> the synthetic data was built so that bigger teams lean digital-first.</p>
-    </div>`
   </script>
   <script type="text/markdown">
     <a id="atlas-network"></a>
 
     ## Six degrees of the survey
 
-    Each response arrives through someone's referral link, so the atlas also records how the survey spread. The Association sits at the center, linked to the ${board.length} board members who seeded the survey (dark dots with a ring). Every lab links to the colleague who invited it, and bigger dots brought in more labs. Hover a lab to trace its chain back to the board.
+    Each response arrives through someone's referral link, so the atlas also records how the survey spread. The Association sits at the center, linked to the ${board.length} board members who seeded the survey (dark dots with a ring). Every operation links to the colleague who invited it, and bigger dots brought in more operations. Hover an operation to trace its chain back to the board.
 
-    The median lab is **${networkStats.median} hops** from the board, the longest chain has **${networkStats.max} hops**, and **${pct(networkStats.withinSix, networkStats.n)}** of labs are within six degrees.
+    The median operation is **${networkStats.median} hops** from the board, the longest chain has **${networkStats.max} hops**, and **${pct(networkStats.withinSix, networkStats.n)}** of operations are within six degrees.
   </script>
   <script type="module">
     referralNetwork(networkLayout, new Set(filtered.map((d) => d.id)))
@@ -170,7 +211,7 @@
   <script type="module">
     html`<div class="row-2">
       <div><b>How far the survey traveled</b>${degreeHistogram(filtered)}</div>
-      <div style="min-width: 280px; max-width: 460px; flex: 1;"><b>Top connectors</b> <span style="color:#6f6e69">(labs referred)</span>${topConnectors(filtered)}</div>
+      <div style="min-width: 280px; max-width: 460px; flex: 1;"><b>Top connectors</b> <span style="color:#6f6e69">(operations referred)</span>${topConnectors(filtered)}</div>
     </div>`
   </script>
   <script type="text/markdown">
@@ -190,6 +231,25 @@
       : html`<p class="empty-note">Every country in this view has at least one response.</p>`
   </script>
   <script type="text/markdown">
+    <a id="atlas-hospitals"></a>
+
+    ## Hospitals covered in the US
+
+    In the US, the public CMS hospital list gives the atlas a denominator: ${d3.format(",")(usCoverage.total)} hospitals in the 50 states and DC. Each operation names the hospitals it signs out for, so one answer from a contracted group that serves 20 hospitals fills in all 20 at once. Responding operations cover **${usCoverage.ops.length && !suppressed(usCoverage.ops.length) ? `${d3.format(",")(usCoverage.covered)} hospitals (${pct(usCoverage.covered, usCoverage.total)})` : `a number too small to show`}**. ${usCoverage.big.ops >= MIN_CELL || (!publicView && usCoverage.big.ops) ? `The ${usCoverage.big.ops} operations that sign out for 6 or more hospitals are ${pct(usCoverage.big.ops, usCoverage.ops.length)} of US responses but cover ${pct(usCoverage.big.hospitals, usCoverage.covered)} of these hospitals.` : ""}
+
+    Hospital totals per state are real; which hospitals are covered is synthetic. In the public view, a state is hatched until ${MIN_CELL} of its operations have responded.
+  </script>
+  <script type="module">
+    usCoverage.ops.length
+      ? html`<div>${usCoverageMap(usCoverage)}
+          <div class="row-2" style="margin-top: 1rem;">
+            <div><b>Share covered, by hospital type</b>${usCoverageByType(usCoverage)}</div>
+            <div><b>US hospitals covered over time</b>${usCoverageTimeline(usCoverage)}</div>
+          </div>
+        </div>`
+      : html`<p class="empty-note">Hospital coverage is modeled for the US only. Choose All regions or North America to see it.</p>`
+  </script>
+  <script type="text/markdown">
     ## Rollout
 
     1. **Pilot (Aug 3–24).** Association board and active members fill it in first, fix confusing questions, and seed the map so it isn't empty at launch.
@@ -204,7 +264,7 @@
 
     ## Take the survey (demo)
 
-    This is the 2–3 minute survey. Submitting adds your lab to the charts above for this browser session only; nothing is sent anywhere.
+    A short version of the 5-minute survey: the core questions on your AP LIS, digital pathology, and bespoke tools. Submitting adds your operation to the charts above for this browser session only; nothing is sent anywhere.
   </script>
   <script type="module">
     const submissions = view(surveyForm());
@@ -212,24 +272,36 @@
   <script type="text/markdown">
     ## The data
 
-    Every response the atlas shows, as a searchable table. ${publicView ? "Labs that asked not to be named appear as their type and location, and " + fmtCount(filtered.filter((d) => !listable(d)).length) + " labs that chose totals only aren't listed. Switching plans show only where the lab says they're announced or under contract; elsewhere the plan columns read “—”." : "Staff view: every response, with names, consent levels, and whether plans are public."}
+    Every response the atlas shows, as a searchable table. ${publicView ? "Operations that asked not to be named appear as their type and location, and " + fmtCount(filtered.filter((d) => !listable(d)).length) + " operations that chose totals only aren't listed. Switching plans show only where the operation says they're announced or under contract; elsewhere the plan columns read “—”." : "Staff view: every response, with names, consent levels, and the answers counted only in totals."}
   </script>
   <script type="module">
     Inputs.table(filtered.filter(listable).map((d) => ({
-      Institution: labelOf(d),
+      Operation: labelOf(d),
       Country: placeOf(d),
       Type: d.type,
-      AP: d.lis.ap,
-      CP: d.lis.cp,
-      Micro: d.lis.micro,
-      "Blood bank": d.lis.bb,
+      Sites: d.sites,
+      "AP LIS": d.lis.ap,
+      "Digital pathology": d.dp,
+      "Bespoke tools": d.bespoke,
       Status: planShown(d) ? d.status : "—",
       "New vendor": planShown(d) ? d.newVendor ?? "" : "—",
       "Go-live": planShown(d) ? (d.goLive ? quarterLabel(d.goLive) : "") : "—",
       Reason: planShown(d) ? d.reason ?? "" : "—",
       "Decided by": planShown(d) ? d.decider ?? "" : "—",
       Hops: d.degree,
-      ...(publicView ? {} : {Consent: CONSENT_LABELS[d.consent], "Plans public": d.newVendor ? (d.plansPublic ? "Yes" : "Not yet") : "", Direction: d.direction, "Informatics team": d.informatics})
+      ...(publicView ? {} : {
+        Consent: CONSENT_LABELS[d.consent],
+        "Plans public": d.newVendor ? (d.plansPublic ? "Yes" : "Not yet") : "",
+        "Clinical lab LIS": d.lis.cp ?? "No clinical lab",
+        "Surgical cases": d.cases,
+        "Digital target": d.dpTarget,
+        "Main barrier": d.barrier,
+        "Informatics staff": d.staff,
+        "Tool areas": d.bespokeAreas.join("; "),
+        "Would share": d.share ?? "",
+        "US state": d.usState ?? "",
+        "Hospitals served": d.hospitals ? d3.sum(d.hospitals) : ""
+      })
     })), {rows: 14, layout: "auto"})
   </script>
   <script type="text/markdown">
@@ -237,13 +309,14 @@
 
     ## How respondents are protected
 
-    Every lab picks one of three consent levels in the survey, and the public view applies two rules on top of them.
+    Every operation picks one of three consent levels in the survey, and the public view applies three rules on top of them.
 
-    - **Named** (${d3.format(",")(consentCounts.get("named") ?? 0)} labs): name shown with systems and announced plans.
-    - **Unnamed** (${d3.format(",")(consentCounts.get("unnamed") ?? 0)} labs): systems and plans shown as, say, "a community hospital in Germany". Where a country has fewer than ${MIN_CELL} responding labs, only the region is given.
-    - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} labs): counted in maps, charts, and totals, but never listed individually.
-    - **Plans:** a listed lab's new vendor, go-live date, reason, and decision-maker appear only once the lab says they're announced or under contract. "Evaluating" is only ever counted in totals, and so are each lab's long-term direction and informatics team size.
-    - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} labs is hidden. Map areas are hatched, and counts read "fewer than ${MIN_CELL}". ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
+    - **Named** (${d3.format(",")(consentCounts.get("named") ?? 0)} operations): name shown with systems, announced plans, and any tools offered for sharing.
+    - **Unnamed** (${d3.format(",")(consentCounts.get("unnamed") ?? 0)} operations): systems and plans shown as, say, "a dermatopathology practice in Germany". Where a country has fewer than ${MIN_CELL} responding operations, only the region is given.
+    - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} operations): counted in maps, charts, and totals, but never listed individually.
+    - **Plans:** a listed operation's new vendor, go-live date, reason, and decision-maker appear only once it says they're announced or under contract. "Evaluating" is only ever counted in totals, and so are each operation's digital pathology target, main barrier, and informatics staffing.
+    - **Bespoke tools:** a tool's name, and what it does, appear only when its operation is shown by name and offers to share it. For every other operation, what the tools do is counted only in totals.
+    - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} operations is hidden. Map areas and bar segments are hatched, and counts read "fewer than ${MIN_CELL}". On the US hospital map, a state stays hatched until ${MIN_CELL} of its operations respond. ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
 
     Switch **Show as** to *Staff view* at the top of the page to see the raw data these rules protect. In the live atlas, that view would sit behind a staff login.
   </script>
@@ -251,8 +324,9 @@
     ## From prototype to live
 
     - **Survey.** Any form tool that exports CSV or has an API works (REDCap, Qualtrics, Google Forms). The referral link is a URL parameter (`?ref=CODE`) stored with each response.
-    - **Data.** A scheduled data loader pulls the responses, removes names for labs that opted out, and publishes one cleaned CSV. The charts on this page read that file instead of the synthetic generator built into this notebook.
-    - **Governance.** The Association owns the dataset. A small editorial group reviews new vendors and merges duplicates, and an open license lets members reuse the data.
+    - **Finding operations.** In the US, the public CMS list of CLIA-certified labs gives names and sites to suggest in the survey and a denominator for coverage. Other countries need their own lists.
+    - **Data.** A scheduled data loader pulls the responses, removes names for operations that opted out, and publishes one cleaned CSV. The charts on this page read that file instead of the synthetic generator built into this notebook.
+    - **Governance.** The Association owns the dataset. A small editorial group reviews new vendors and tools and merges duplicate operations, and an open license lets members reuse the data.
   </script>
   <script type="module">
     const VENDORS = ["Sirius Cybernetics", "Cassandra Health", "Magrathea Labs", "Babel Fish Health", "Labyrinth Clinical", "Heart of Gold Medical", "Deep Thought Computer", "Whirlwind Medical", "Vineyard Software", "Other commercial", "Bespoke (in-house)"];
@@ -284,21 +358,48 @@
     const AXIS = "#c3c2b7";
     const SURFACE = "#fcfcfb";
     const PLOT_STYLE = {fontSize: "12px", fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", color: INK2, background: "transparent"};
-    const DISCIPLINES = [
-      {key: "cp", label: "Clinical pathology"},
-      {key: "ap", label: "Anatomic pathology"},
-      {key: "micro", label: "Microbiology"},
-      {key: "bb", label: "Blood bank"}
-    ];
     const STATUSES = ["Stable", "Evaluating", "Selected", "Implementing"];
-    const TYPES = ["Academic medical center", "Community hospital", "Reference / commercial lab", "Public health lab", "Independent pathology practice"];
+    // The unit is the AP operation: the group that signs out surgical pathology and cytology for one or more sites.
+    const TYPES = ["Hospital department", "Academic department", "Contracted pathology group", "Independent AP lab", "Dermatopathology practice"];
     const REASONS = ["Enterprise EHR consolidation", "Vendor end-of-life / sunset", "Health-system merger or acquisition", "Digital pathology & AI readiness", "Total cost of ownership", "Usability & workflow", "Regulatory & interoperability"];
     const CONSOLIDATION_REASONS = ["Enterprise EHR consolidation", "Health-system merger or acquisition"];
-    const DECIDERS = ["Lab or pathology leadership", "Joint lab and IT committee", "Health-system IT or executives", "Followed the EHR decision", "Parent organization after a merger"];
-    const LAB_AT_TABLE = ["Lab or pathology leadership", "Joint lab and IT committee"];
-    const DIRECTIONS = ["Keep a traditional LIS", "LIS plus digital pathology add-ons", "Move to digital-first orchestration", "Already primary digital", "Undecided"];
-    const DIGITAL_FIRST = ["Move to digital-first orchestration", "Already primary digital"];
-    const INFORMATICS_TEAMS = ["None", "1–2 people", "3–10 people", "More than 10"];
+    const DECIDERS = ["Pathology leadership", "Joint pathology and IT committee", "Health-system IT or executives", "Followed the EHR decision", "Parent organization after a merger"];
+    const PATHOLOGY_AT_TABLE = ["Pathology leadership", "Joint pathology and IT committee"];
+    const SITES = ["1", "2–5", "6–20", "More than 20"];
+    const CASE_BANDS = ["Under 5,000", "5,000–15,000", "15,000–40,000", "40,000–100,000", "Over 100,000"];
+    const STAFF_BANDS = ["Under 1 FTE", "1–2 FTE", "3–5 FTE", "More than 5 FTE"];
+    const DP_STATUSES = ["None", "Research or teaching only", "Pilot or validation", "Part of clinical sign-out", "Primary digital"];
+    const DP_CLINICAL = ["Part of clinical sign-out", "Primary digital"];
+    const DP_COLORS = ["#d6d4cc", "#cde2fb", "#86b6ef", "#3987e5", "#0d366b"];
+    const SCANNED_SHARES = ["Under 10%", "10–50%", "50–90%", "Over 90%"];
+    const DP_TARGETS = ["2027", "2028", "2029", "2030", "2031", "No target yet"];
+    const BARRIERS = ["Cost and return on investment", "Storage and IT infrastructure", "LIS integration", "Pathologist adoption", "Validation and regulation", "Staffing", "Scanner capacity"];
+    const IMS_TYPES = ["Separate product", "LIS vendor's module", "Scanner vendor's software", "Bespoke", "None"];
+    const INTEGRATION_LEVELS = ["Not connected", "Images open from the LIS case", "Two-way", "Separate workflow layer"];
+    const AI_USES = ["Prostate", "Breast", "GI", "Slide quality control", "Case triage", "IHC quantification"];
+    const BESPOKE_STATUSES = ["Yes, in clinical use", "Yes, in development", "No"];
+    const BESPOKE_AREAS = ["Case assignment and workload", "Specimen, block and slide tracking", "Grossing and histology workflow", "Synoptic reporting", "QA and turnaround monitoring", "Dashboards and analytics", "Interfaces and middleware", "Digital pathology orchestration", "AI deployment", "Billing and coding", "Research, biobank and education"];
+    const SHARE_CHOICES = ["Already shared", "Yes", "Maybe", "No"];
+    const SHARING = ["Already shared", "Yes"];
+    const SUPPORT_LEVELS = ["Embedded team with releases", "One or two people as time allows", "No formal support"];
+    // US hospitals by state: [FIPS code, name, acute care, critical access, children's]. Real counts from the public CMS
+    // Hospital General Information list (July 2026); the only real numbers on this page.
+    const US_STATES = {
+      AL: ["01", "Alabama", 73, 9, 2], AK: ["02", "Alaska", 8, 13, 0], AZ: ["04", "Arizona", 66, 17, 1], AR: ["05", "Arkansas", 42, 29, 2],
+      CA: ["06", "California", 276, 38, 10], CO: ["08", "Colorado", 51, 32, 2], CT: ["09", "Connecticut", 26, 0, 1], DE: ["10", "Delaware", 6, 0, 1],
+      DC: ["11", "District of Columbia", 6, 0, 1], FL: ["12", "Florida", 167, 12, 3], GA: ["13", "Georgia", 96, 31, 2], HI: ["15", "Hawaii", 11, 9, 2],
+      ID: ["16", "Idaho", 16, 26, 0], IL: ["17", "Illinois", 114, 55, 3], IN: ["18", "Indiana", 82, 33, 0], IA: ["19", "Iowa", 30, 82, 0],
+      KS: ["20", "Kansas", 44, 83, 1], KY: ["21", "Kentucky", 59, 29, 0], LA: ["22", "Louisiana", 82, 27, 1], ME: ["23", "Maine", 13, 18, 0],
+      MD: ["24", "Maryland", 43, 0, 2], MA: ["25", "Massachusetts", 55, 4, 3], MI: ["26", "Michigan", 90, 35, 1], MN: ["27", "Minnesota", 45, 76, 2],
+      MS: ["28", "Mississippi", 59, 30, 0], MO: ["29", "Missouri", 62, 35, 4], MT: ["30", "Montana", 11, 50, 0], NE: ["31", "Nebraska", 25, 62, 2],
+      NV: ["32", "Nevada", 22, 13, 0], NH: ["33", "New Hampshire", 13, 13, 0], NJ: ["34", "New Jersey", 61, 0, 2], NM: ["35", "New Mexico", 26, 13, 0],
+      NY: ["36", "New York", 128, 21, 1], NC: ["37", "North Carolina", 80, 20, 0], ND: ["38", "North Dakota", 7, 37, 0], OH: ["39", "Ohio", 118, 33, 8],
+      OK: ["40", "Oklahoma", 76, 39, 2], OR: ["41", "Oregon", 32, 25, 1], PA: ["42", "Pennsylvania", 131, 17, 5], RI: ["44", "Rhode Island", 10, 0, 0],
+      SC: ["45", "South Carolina", 51, 3, 1], SD: ["46", "South Dakota", 17, 39, 1], TN: ["47", "Tennessee", 78, 15, 2], TX: ["48", "Texas", 285, 93, 16],
+      UT: ["49", "Utah", 33, 13, 1], VT: ["50", "Vermont", 6, 8, 0], VA: ["51", "Virginia", 72, 8, 2], WA: ["53", "Washington", 46, 39, 3],
+      WV: ["54", "West Virginia", 25, 21, 0], WI: ["55", "Wisconsin", 64, 58, 2], WY: ["56", "Wyoming", 9, 19, 0]
+    };
+    const US_HOSPITAL_TYPES = ["Acute care", "Critical access", "Children's"];
     const REGIONS = ["North America", "Europe", "Middle East", "Asia-Pacific", "Latin America", "Africa"];
     const REGION_EXTENT = {
       "North America": [[-168, 14], [-52, 72]],
@@ -322,6 +423,7 @@
     const pct = (a, b) => (b ? d3.format(".0%")(a / b) : "—");
     const quarterLabel = (date) => `Q${Math.floor(date.getUTCMonth() / 3) + 1} ${date.getUTCFullYear()}`;
     const articleFor = (s) => (/^[aeiou]/i.test(s) ? "An" : "A");
+    const lowerFirst = (s) => s[0].toLowerCase() + s.slice(1);
     const hatchId = () => `hatch-${Math.random().toString(36).slice(2, 9)}`;
 
     // A diagonal hatch for map areas hidden by small-cell suppression.
@@ -403,6 +505,7 @@
   </script>
   <script type="module">
     const world = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json").then((response) => response.json());
+    const usAtlas = fetch("https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json").then((response) => response.json());
   </script>
   <script type="module">
     const countryFeatures = topojson.feature(world, world.objects.countries).features
@@ -410,6 +513,9 @@
       .sort((a, b) => d3.ascending(a.properties.name, b.properties.name));
     const land = {type: "FeatureCollection", features: countryFeatures};
     const borders = topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
+    const STATE_BY_FIPS = new Map(Object.entries(US_STATES).map(([abbr, [fips]]) => [fips, abbr]));
+    const usStateFeatures = topojson.feature(usAtlas, usAtlas.objects.states).features.filter((f) => STATE_BY_FIPS.has(f.id));
+    const usStateBorders = topojson.mesh(usAtlas, usAtlas.objects.states, (a, b) => a !== b);
   </script>
   <script type="module">
     // [ISO numeric id, name, region, synthetic responses, vendor profile]
@@ -462,7 +568,7 @@
     ];
     const COUNTRY_BY_ID = new Map(COUNTRIES.map(([id, name, region]) => [id, {id, name, region}]));
 
-    // Relative weights for the LIS a lab runs today, by market.
+    // Relative weights for the LIS an operation runs today, by market.
     const PROFILES = {
       us: {"Sirius Cybernetics": 34, "Cassandra Health": 17, "Magrathea Labs": 18, "Deep Thought Computer": 9, "Whirlwind Medical": 9, "Vineyard Software": 7, "Other commercial": 3, "Bespoke (in-house)": 3},
       ca: {"Sirius Cybernetics": 28, "Cassandra Health": 26, "Deep Thought Computer": 18, "Magrathea Labs": 10, "Whirlwind Medical": 12, "Other commercial": 6},
@@ -483,7 +589,7 @@
       us: {"Cassandra Health": 30, "Sirius Cybernetics": 25, "Other commercial": 30, "Magrathea Labs": 10, "Bespoke (in-house)": 5},
       ca: {"Cassandra Health": 30, "Sirius Cybernetics": 25, "Other commercial": 30, "Deep Thought Computer": 15}
     };
-    // Where labs that have picked a new vendor are going, by market.
+    // Where operations that have picked a new vendor are going, by market.
     const TARGETS = {
       us: {"Sirius Cybernetics": 72, "Cassandra Health": 7, "Magrathea Labs": 9, "Other commercial": 12},
       ca: {"Sirius Cybernetics": 62, "Cassandra Health": 18, "Magrathea Labs": 8, "Other commercial": 12},
@@ -501,27 +607,76 @@
       africa: {"Babel Fish Health": 40, "Other commercial": 45, "Magrathea Labs": 15}
     };
     const PROPENSITY = {"Sirius Cybernetics": 0.25, "Whirlwind Medical": 1.6, "Deep Thought Computer": 1.35, "Bespoke (in-house)": 1.5, "Magrathea Labs": 1.15, "Cassandra Health": 1.2, "Vineyard Software": 0.9};
-    const TYPE_MIX = {"Academic medical center": 30, "Community hospital": 34, "Reference / commercial lab": 14, "Public health lab": 8, "Independent pathology practice": 14};
+    const TYPE_MIX = {"Hospital department": 40, "Academic department": 18, "Contracted pathology group": 16, "Independent AP lab": 14, "Dermatopathology practice": 12};
     const REASONS_TO_SIRIUS = {"Enterprise EHR consolidation": 52, "Health-system merger or acquisition": 16, "Vendor end-of-life / sunset": 10, "Digital pathology & AI readiness": 8, "Usability & workflow": 8, "Total cost of ownership": 3, "Regulatory & interoperability": 3};
     const DECIDER_MIX = {
-      "Enterprise EHR consolidation": {"Followed the EHR decision": 55, "Health-system IT or executives": 33, "Joint lab and IT committee": 10, "Lab or pathology leadership": 2},
-      "Health-system merger or acquisition": {"Parent organization after a merger": 58, "Health-system IT or executives": 30, "Joint lab and IT committee": 12},
-      other: {"Lab or pathology leadership": 42, "Joint lab and IT committee": 36, "Health-system IT or executives": 22}
+      "Enterprise EHR consolidation": {"Followed the EHR decision": 55, "Health-system IT or executives": 33, "Joint pathology and IT committee": 10, "Pathology leadership": 2},
+      "Health-system merger or acquisition": {"Parent organization after a merger": 58, "Health-system IT or executives": 30, "Joint pathology and IT committee": 12},
+      other: {"Pathology leadership": 46, "Joint pathology and IT committee": 34, "Health-system IT or executives": 20}
     };
-    const TEAM_MIX = {
-      "Academic medical center": {"None": 3, "1–2 people": 17, "3–10 people": 50, "More than 10": 30},
-      "Community hospital": {"None": 35, "1–2 people": 45, "3–10 people": 17, "More than 10": 3},
-      "Reference / commercial lab": {"None": 5, "1–2 people": 20, "3–10 people": 40, "More than 10": 35},
-      "Public health lab": {"None": 30, "1–2 people": 45, "3–10 people": 22, "More than 10": 3},
-      "Independent pathology practice": {"None": 40, "1–2 people": 40, "3–10 people": 17, "More than 10": 3}
+    const SITES_MIX = {
+      "Hospital department": {"1": 55, "2–5": 35, "6–20": 9, "More than 20": 1},
+      "Academic department": {"1": 25, "2–5": 45, "6–20": 25, "More than 20": 5},
+      "Contracted pathology group": {"1": 5, "2–5": 35, "6–20": 40, "More than 20": 20},
+      "Independent AP lab": {"1": 30, "2–5": 30, "6–20": 25, "More than 20": 15},
+      "Dermatopathology practice": {"1": 50, "2–5": 30, "6–20": 15, "More than 20": 5}
     };
-    // Bigger informatics teams lean toward digital-first.
-    const DIRECTION_MIX = {
-      "None": {"Keep a traditional LIS": 48, "LIS plus digital pathology add-ons": 27, "Move to digital-first orchestration": 3, "Already primary digital": 1, "Undecided": 21},
-      "1–2 people": {"Keep a traditional LIS": 36, "LIS plus digital pathology add-ons": 38, "Move to digital-first orchestration": 7, "Already primary digital": 2, "Undecided": 17},
-      "3–10 people": {"Keep a traditional LIS": 24, "LIS plus digital pathology add-ons": 44, "Move to digital-first orchestration": 14, "Already primary digital": 6, "Undecided": 12},
-      "More than 10": {"Keep a traditional LIS": 16, "LIS plus digital pathology add-ons": 42, "Move to digital-first orchestration": 22, "Already primary digital": 11, "Undecided": 9}
+    const CASES_MIX = {
+      "Hospital department": {"Under 5,000": 15, "5,000–15,000": 40, "15,000–40,000": 35, "40,000–100,000": 9, "Over 100,000": 1},
+      "Academic department": {"Under 5,000": 1, "5,000–15,000": 9, "15,000–40,000": 35, "40,000–100,000": 40, "Over 100,000": 15},
+      "Contracted pathology group": {"Under 5,000": 2, "5,000–15,000": 18, "15,000–40,000": 40, "40,000–100,000": 30, "Over 100,000": 10},
+      "Independent AP lab": {"Under 5,000": 5, "5,000–15,000": 20, "15,000–40,000": 35, "40,000–100,000": 25, "Over 100,000": 15},
+      "Dermatopathology practice": {"Under 5,000": 10, "5,000–15,000": 30, "15,000–40,000": 35, "40,000–100,000": 20, "Over 100,000": 5}
     };
+    const STAFF_MIX = {
+      "Hospital department": {"Under 1 FTE": 50, "1–2 FTE": 35, "3–5 FTE": 12, "More than 5 FTE": 3},
+      "Academic department": {"Under 1 FTE": 5, "1–2 FTE": 25, "3–5 FTE": 40, "More than 5 FTE": 30},
+      "Contracted pathology group": {"Under 1 FTE": 30, "1–2 FTE": 40, "3–5 FTE": 22, "More than 5 FTE": 8},
+      "Independent AP lab": {"Under 1 FTE": 35, "1–2 FTE": 40, "3–5 FTE": 20, "More than 5 FTE": 5},
+      "Dermatopathology practice": {"Under 1 FTE": 60, "1–2 FTE": 32, "3–5 FTE": 7, "More than 5 FTE": 1}
+    };
+    // Bigger informatics teams go digital sooner and build more of their own tools (an illustrative pattern).
+    const DP_MIX = {
+      "Under 1 FTE": {"None": 44, "Research or teaching only": 6, "Pilot or validation": 24, "Part of clinical sign-out": 20, "Primary digital": 6},
+      "1–2 FTE": {"None": 30, "Research or teaching only": 8, "Pilot or validation": 26, "Part of clinical sign-out": 27, "Primary digital": 9},
+      "3–5 FTE": {"None": 16, "Research or teaching only": 12, "Pilot or validation": 24, "Part of clinical sign-out": 33, "Primary digital": 15},
+      "More than 5 FTE": {"None": 6, "Research or teaching only": 14, "Pilot or validation": 18, "Part of clinical sign-out": 36, "Primary digital": 26}
+    };
+    const SCANNED_MIX = {
+      "Part of clinical sign-out": {"Under 10%": 25, "10–50%": 45, "50–90%": 25, "Over 90%": 5},
+      "Primary digital": {"50–90%": 25, "Over 90%": 75}
+    };
+    const TARGET_MIX = {
+      "None": {"2029": 4, "2030": 6, "2031": 5, "No target yet": 85},
+      "Research or teaching only": {"2028": 10, "2029": 15, "2030": 15, "2031": 10, "No target yet": 50},
+      "Pilot or validation": {"2027": 15, "2028": 30, "2029": 25, "2030": 10, "No target yet": 20},
+      "Part of clinical sign-out": {"2027": 30, "2028": 35, "2029": 18, "2030": 7, "No target yet": 10}
+    };
+    const BARRIER_MIX = {"Cost and return on investment": 30, "Storage and IT infrastructure": 18, "LIS integration": 18, "Pathologist adoption": 10, "Validation and regulation": 8, "Staffing": 10, "Scanner capacity": 6};
+    const IMS_MIX = {"Separate product": 34, "LIS vendor's module": 22, "Scanner vendor's software": 28, "Bespoke": 8, "None": 8};
+    const INTEGRATION_MIX = {
+      "Under 1 FTE": {"Not connected": 40, "Images open from the LIS case": 45, "Two-way": 13, "Separate workflow layer": 2},
+      "1–2 FTE": {"Not connected": 28, "Images open from the LIS case": 47, "Two-way": 20, "Separate workflow layer": 5},
+      "3–5 FTE": {"Not connected": 15, "Images open from the LIS case": 42, "Two-way": 30, "Separate workflow layer": 13},
+      "More than 5 FTE": {"Not connected": 6, "Images open from the LIS case": 30, "Two-way": 38, "Separate workflow layer": 26}
+    };
+    const AI_RATE = {"Part of clinical sign-out": 0.16, "Primary digital": 0.3};
+    const BESPOKE_MIX = {
+      "Under 1 FTE": {"Yes, in clinical use": 8, "Yes, in development": 6, "No": 86},
+      "1–2 FTE": {"Yes, in clinical use": 22, "Yes, in development": 12, "No": 66},
+      "3–5 FTE": {"Yes, in clinical use": 45, "Yes, in development": 15, "No": 40},
+      "More than 5 FTE": {"Yes, in clinical use": 70, "Yes, in development": 12, "No": 18}
+    };
+    const AREA_RATE = {"Case assignment and workload": 0.45, "Specimen, block and slide tracking": 0.35, "Grossing and histology workflow": 0.2, "Synoptic reporting": 0.25, "QA and turnaround monitoring": 0.4, "Dashboards and analytics": 0.55, "Interfaces and middleware": 0.35, "Digital pathology orchestration": 0.1, "AI deployment": 0.05, "Billing and coding": 0.15, "Research, biobank and education": 0.25};
+    const SHARE_MIX = {"Already shared": 8, "Yes": 22, "Maybe": 40, "No": 30};
+    const SUPPORT_MIX = {
+      "Under 1 FTE": {"Embedded team with releases": 5, "One or two people as time allows": 55, "No formal support": 40},
+      "1–2 FTE": {"Embedded team with releases": 15, "One or two people as time allows": 65, "No formal support": 20},
+      "3–5 FTE": {"Embedded team with releases": 45, "One or two people as time allows": 45, "No formal support": 10},
+      "More than 5 FTE": {"Embedded team with releases": 70, "One or two people as time allows": 25, "No formal support": 5}
+    };
+    // Invented tool names, built from the operation's place name.
+    const TOOL_NOUNS = {"Case assignment and workload": "Case Router", "Specimen, block and slide tracking": "Slide Tracker", "Grossing and histology workflow": "Grossing Bench", "Synoptic reporting": "Synoptic Builder", "QA and turnaround monitoring": "TAT Watch", "Dashboards and analytics": "Path Dashboard", "Interfaces and middleware": "Interface Hub", "Digital pathology orchestration": "Scan Orchestrator", "AI deployment": "AI Gateway", "Billing and coding": "Coding Assistant", "Research, biobank and education": "Biobank Registry"};
     const REASONS_OTHER = {"Vendor end-of-life / sunset": 25, "Digital pathology & AI readiness": 19, "Total cost of ownership": 17, "Usability & workflow": 15, "Regulatory & interoperability": 12, "Health-system merger or acquisition": 8, "Enterprise EHR consolidation": 4};
     const BOARD_QUOTA = {"840": 8, "124": 2, "826": 2, "276": 1, "528": 1, "036": 1, "724": 1, "682": 1, "250": 1};
     const REACH = {us: "core", ca: "core", uk: "core", dach: "core", south: "core", nordic: "core", anz: "core", gulf: "mid", east: "mid", za: "mid", eastasia: "far", southasia: "far", latam: "far", africa: "far"};
@@ -534,11 +689,11 @@
     const STEMS_A = ["Lark", "Vell", "Quill", "Orren", "Staven", "Merrow", "Tolle", "Bracken", "Halven", "Corva", "Pell", "Wyn", "Thorn", "Elm", "Draven", "Kestrel", "Salt", "Ravel", "Amber", "Bel", "Cairn", "Delm", "Fen", "Gale", "Hollin", "Jessa", "Kell", "Loma", "Mir", "Nor", "Oak", "Penn", "Rook", "Sel", "Tarn", "Umber", "Val", "Wren"];
     const STEMS_B = ["moor", "port", "field", "vale", "brook", "wind", "shaw", "rill", "ridge", "stead", "quay", "grave", "hall", "ton", "mere", "ford", "haven", "crest", "wick", "ley", "by", "dale", "holm", "gate"];
     const NAME_PATTERNS = {
-      "Academic medical center": [(p) => `${p} University Hospital`, (p) => `${p} Academic Medical Center`],
-      "Community hospital": [(p) => `${p} General Hospital`, (p) => `${p} Regional Medical Center`, (p) => `${p} Memorial Hospital`],
-      "Reference / commercial lab": [(p) => `${p} Reference Laboratories`, (p) => `${p} Diagnostics`],
-      "Public health lab": [(p) => `${p} Public Health Laboratory`],
-      "Independent pathology practice": [(p) => `${p} Pathology Associates`, (p) => `${p} Pathology Group`]
+      "Hospital department": [(p) => `${p} General Hospital Pathology`, (p) => `${p} Regional Medical Center Pathology`, (p) => `${p} Memorial Hospital Pathology`],
+      "Academic department": [(p) => `${p} University Department of Pathology`, (p) => `${p} Academic Medical Center Pathology`],
+      "Contracted pathology group": [(p) => `${p} Pathology Associates`, (p) => `${p} Pathology Group`, (p) => `${p} Pathologists`],
+      "Independent AP lab": [(p) => `${p} Pathology Laboratory`, (p) => `${p} Histopathology`],
+      "Dermatopathology practice": [(p) => `${p} Dermatopathology`, (p) => `${p} Skin Pathology Lab`]
     };
     const hospitalUniversitario = (p) => `Hospital Universitario de ${p}`;
     const hospitalUniversitario2 = (p) => `Hospital Universitário de ${p}`;
@@ -564,7 +719,23 @@
       const announceRandom = d3.randomLcg(4242);
       const decideRandom = d3.randomLcg(8128);
       const teamRandom = d3.randomLcg(2718);
-      const directionRandom = d3.randomLcg(31337);
+      const dpRandom = d3.randomLcg(31337);
+      const toolRandom = d3.randomLcg(9091);
+      const hospitalRandom = d3.randomLcg(4523);
+      // US operations get a state, weighted by its hospitals, and the hospitals they sign out for: [acute, critical access, children's].
+      const stateWeights = Object.fromEntries(Object.entries(US_STATES).map(([abbr, [, , acute, cah]]) => [abbr, acute + 0.5 * cah]));
+      const hospitalsServed = (type, sites) => {
+        const r = hospitalRandom;
+        const n = {"1": 1, "2–5": 2 + Math.floor(r() * 4), "6–20": 6 + Math.floor(r() * 15), "More than 20": 21 + Math.floor(r() * 15)}[sites];
+        const count = type === "Dermatopathology practice" ? 0 : type === "Independent AP lab" ? Math.round(n * 0.3 * r()) : n;
+        const cahRate = {"Contracted pathology group": 0.3, "Hospital department": 0.12, "Independent AP lab": 0.2, "Academic department": 0.05}[type] ?? 0;
+        const served = [0, 0, 0];
+        for (let i = 0; i < count; ++i) {
+          const x = r();
+          served[type === "Academic department" && i > 0 && x > 0.9 ? 2 : x < cahRate ? 1 : 0] += 1;
+        }
+        return served;
+      };
       const pick = (weights, rng = random) => {
         const entries = Object.entries(weights);
         let r = rng() * d3.sum(entries, ([, w]) => w);
@@ -598,18 +769,15 @@
       for (const [countryId, country, region, n, profile] of COUNTRIES) {
         for (let i = 0; i < n; ++i) {
           const board = i < (BOARD_QUOTA[countryId] ?? 0);
-          const type = board ? "Academic medical center" : pick(TYPE_MIX);
+          const type = board ? "Academic department" : pick(TYPE_MIX);
+          // The AP LIS; the clinical lab's system is kept only to ask whether it is the same vendor.
           const cp = pick(PROFILES[profile]);
-          const lis = {
-            cp,
-            ap: random() < 0.55 ? cp : pick(AP_PROFILES[profile] ?? PROFILES[profile]),
-            micro: random() < 0.85 ? cp : pick(PROFILES[profile]),
-            bb: random() < 0.6 ? cp : pick(PROFILES[profile])
-          };
-          const switching = random() < Math.min(0.85, 0.36 * (PROPENSITY[cp] ?? 1));
+          const ap = random() < 0.55 ? cp : pick(AP_PROFILES[profile] ?? PROFILES[profile]);
+          const lis = {ap, cp: type === "Independent AP lab" || type === "Dermatopathology practice" ? null : cp};
+          const switching = random() < Math.min(0.85, 0.36 * (PROPENSITY[ap] ?? 1));
           const status = switching ? pick({Evaluating: 35, Selected: 22, Implementing: 43}) : "Stable";
           const committed = status === "Selected" || status === "Implementing";
-          const newVendor = committed ? pickExcept(TARGETS[profile], cp) : null;
+          const newVendor = committed ? pickExcept(TARGETS[profile], ap) : null;
           let goLive = null;
           if (committed) {
             const year = +pick(status === "Implementing" ? {2026: 14, 2027: 56, 2028: 30} : {2027: 18, 2028: 47, 2029: 27, 2030: 8});
@@ -618,25 +786,46 @@
           }
           const reason = switching ? pick(newVendor === "Sirius Cybernetics" ? REASONS_TO_SIRIUS : REASONS_OTHER) : null;
           const decider = reason ? pick(DECIDER_MIX[reason] ?? DECIDER_MIX.other, decideRandom) : null;
-          const informatics = pick(TEAM_MIX[type], teamRandom);
-          const direction = pick(DIRECTION_MIX[informatics], directionRandom);
-          const previous = !switching && random() < (cp === "Sirius Cybernetics" ? 0.34 : 0.07)
-            ? {vendor: pickExcept(PROFILES[profile], cp), date: between(utc(2021, 6, 1), utc(2026, 9, 1))}
+          const staff = pick(STAFF_MIX[type], teamRandom);
+          const sites = pick(SITES_MIX[type], dpRandom);
+          const cases = pick(CASES_MIX[type], dpRandom);
+          const dp = pick(DP_MIX[staff], dpRandom);
+          const clinical = DP_CLINICAL.includes(dp);
+          const scanned = clinical ? pick(SCANNED_MIX[dp], dpRandom) : null;
+          const dpTarget = dp === "Primary digital" ? "Already there" : pick(TARGET_MIX[dp], dpRandom);
+          const barrier = pick(BARRIER_MIX, dpRandom);
+          const ims = dp === "None" ? null : pick(IMS_MIX, dpRandom);
+          const integration = ims && ims !== "None" ? pick(INTEGRATION_MIX[staff], dpRandom) : null;
+          const ai = clinical ? AI_USES.filter(() => dpRandom() < AI_RATE[dp]) : [];
+          const bespoke = pick(BESPOKE_MIX[staff], toolRandom);
+          const bespokeAreas = bespoke === "No" ? [] : BESPOKE_AREAS.filter((area) => {
+            const rate = area === "Digital pathology orchestration" && clinical ? 0.45 : area === "AI deployment" && ai.length ? 0.4 : AREA_RATE[area];
+            return toolRandom() < rate;
+          });
+          if (bespoke !== "No" && !bespokeAreas.length) bespokeAreas.push(BESPOKE_AREAS[Math.floor(toolRandom() * BESPOKE_AREAS.length)]);
+          const share = bespoke === "No" ? null : pick(SHARE_MIX, toolRandom);
+          const support = bespoke === "No" ? null : pick(SUPPORT_MIX[staff], toolRandom);
+          const previous = !switching && random() < (ap === "Sirius Cybernetics" ? 0.34 : 0.07)
+            ? {vendor: pickExcept(PROFILES[profile], ap), date: between(utc(2021, 6, 1), utc(2026, 9, 1))}
             : null;
           const showName = board || random() < 0.68;
           const place = placeName();
-          const name = type === "Academic medical center" && LOCAL_AMC[countryId] ? LOCAL_AMC[countryId](place) : choice(NAME_PATTERNS[type])(place);
+          const name = type === "Academic department" && LOCAL_AMC[countryId] ? LOCAL_AMC[countryId](place) : choice(NAME_PATTERNS[type])(place);
+          const tools = SHARING.includes(share) ? bespokeAreas.slice(0, 2).map((area) => ({name: `${place} ${TOOL_NOUNS[area]}`, area})) : [];
+          const usState = countryId === "840" ? pick(stateWeights, hospitalRandom) : null;
+          const hospitals = usState ? hospitalsServed(type, sites) : null;
           rows.push({
             id: `L${String(++serial).padStart(3, "0")}`,
             name,
             consent: showName ? "named" : consentRandom() < 0.6 ? "unnamed" : "aggregate",
             plansPublic: committed && announceRandom() < (status === "Implementing" ? 0.85 : 0.5),
-            country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, decider, informatics, direction, previous, board
+            country, countryId, region, profile, type, lis, status, newVendor, goLive, reason, decider, previous, board,
+            staff, sites, cases, dp, scanned, dpTarget, barrier, ims, integration, ai, bespoke, bespokeAreas, share, support, tools, usState, hospitals
           });
         }
       }
 
-      // When each lab answered, by rollout phase.
+      // When each operation answered, by rollout phase.
       for (const d of rows) {
         if (d.board) {
           d.wave = "Board";
@@ -650,7 +839,7 @@
       rows.sort((a, b) => a.submitted - b.submitted);
 
       // Who referred whom: mostly a colleague in the same country who answered recently (their referral link is fresh),
-      // with a pull toward labs that already referred others.
+      // with a pull toward operations that already referred others.
       const RICH = 1.2, BOARD_PULL = 0.6, FRESH_DAYS = 10;
       const boardRows = rows.filter((d) => d.board);
       for (const d of boardRows) Object.assign(d, {referrer: null, degree: 0, children: 0});
@@ -682,24 +871,27 @@
     const responses = [...seedResponses, ...submissions];
     const filtered = responses.filter((d) =>
       (region === "All regions" || d.region === region) &&
-      (instType === "All institution types" || d.type === instType)
+      (instType === "All operation types" || d.type === instType)
     );
   </script>
   <script type="module">
     const publicView = audience === AUDIENCES[0];
     const suppressed = (n) => publicView && n > 0 && n < MIN_CELL;
     const fmtCount = (n) => (suppressed(n) ? `fewer than ${MIN_CELL}` : d3.format(",")(n));
-    const pctOf = (a, b) => (suppressed(b) ? "—" : pct(a, b));
+    // A share is hidden when the group, the part, or the rest of the group is under MIN_CELL.
+    const pctOf = (a, b) => (suppressed(a) || suppressed(b) || suppressed(b - a) ? "—" : pct(a, b));
+    // A count that is part of a printed total is hidden when the rest of that total is small.
+    const fmtPart = (a, total) => (suppressed(total - a) ? `all but fewer than ${MIN_CELL}` : fmtCount(a));
     const countryTotals = d3.rollup(responses, (v) => v.length, (d) => d.countryId);
-    // Unnamed labs in small countries are placed by region, so the country can't single them out.
+    // Unnamed operations in small countries are placed by region, so the country can't single them out.
     const placeOf = (d) => (!publicView || d.consent === "named" || (countryTotals.get(d.countryId) ?? 0) >= MIN_CELL ? d.country : d.region);
     const listable = (d) => !publicView || d.consent !== "aggregate";
-    // A lab's own plans are listed only once it says they're announced or under contract; "Evaluating" never is.
+    // An operation's own plans are listed only once it says they're announced or under contract; "Evaluating" never is.
     const planShown = (d) => !publicView || d.plansPublic;
     function labelOf(d) {
       if (!publicView || d.consent === "named") return d.name;
-      if (d.consent === "unnamed") return `${articleFor(d.type)} ${d.type.toLowerCase()} in ${placeOf(d)}`;
-      return "A lab counted in totals only";
+      if (d.consent === "unnamed") return `${articleFor(d.type)} ${lowerFirst(d.type)} in ${placeOf(d)}`;
+      return "An operation counted in totals only";
     }
     const consentCounts = d3.rollup(responses, (v) => v.length, (d) => d.consent);
     const hatchedCountries = d3.sum(d3.group(filtered, (d) => d.countryId).values(), (list) =>
@@ -716,7 +908,13 @@
         committed: committed.length,
         toSirius: committed.filter((d) => d.newVendor === "Sirius Cybernetics").length,
         upcoming: committed.filter((d) => d.goLive >= utc(2026, 10, 1)).length,
-        digitalFirst: filtered.filter((d) => DIGITAL_FIRST.includes(d.direction)).length
+        dpClinical: filtered.filter((d) => DP_CLINICAL.includes(d.dp)).length,
+        primary: filtered.filter((d) => d.dp === "Primary digital").length,
+        bespoke: filtered.filter((d) => d.bespoke === BESPOKE_STATUSES[0]).length,
+        developing: filtered.filter((d) => d.bespoke === BESPOKE_STATUSES[1]).length,
+        withClinical: filtered.filter((d) => d.lis.cp).length,
+        sameVendor: filtered.filter((d) => d.lis.cp === d.lis.ap).length,
+        offering: filtered.filter((d) => SHARING.includes(d.share)).length
       };
     })();
   </script>
@@ -732,12 +930,12 @@
 
     function vendorMap(rows, disc, region) {
       const stats = countryStats(rows, disc);
-      // Small-cell suppression: color a country only when its leading vendor has at least MIN_CELL labs.
+      // Small-cell suppression: color a country only when its leading vendor has at least MIN_CELL operations.
       const hidden = (f) => suppressed(stats.get(f.id).counts[0][1]);
       const describe = (f, i) => {
         const s = stats.get(f.id);
         const c = s.counts[i];
-        return !c ? "—" : suppressed(c[1]) ? `hidden (fewer than ${MIN_CELL} labs)` : `${c[0]} (${pct(c[1], s.n)})`;
+        return !c ? "—" : suppressed(c[1]) ? `hidden (fewer than ${MIN_CELL} operations)` : `${c[0]} (${pct(c[1], s.n)})`;
       };
       const id = hatchId();
       const plot = Plot.plot({
@@ -757,8 +955,8 @@
             tip: {format: {x: false, y: false}},
             channels: {
               Country: (f) => f.properties.name,
-              "Labs responding": (f) => fmtCount(stats.get(f.id).n),
-              Status: () => `Hidden: no vendor here has ${MIN_CELL} or more labs`
+              "Operations responding": (f) => fmtCount(stats.get(f.id).n),
+              Status: () => `Hidden: no vendor here has ${MIN_CELL} or more operations`
             }
           })),
           Plot.geo(countryFeatures.filter((f) => stats.has(f.id) && !hidden(f)), Plot.centroid({
@@ -766,7 +964,7 @@
             tip: {format: {x: false, y: false, fill: false}},
             channels: {
               Country: (f) => f.properties.name,
-              "Labs responding": (f) => stats.get(f.id).n,
+              "Operations responding": (f) => stats.get(f.id).n,
               "Most common": (f) => describe(f, 0),
               "Runner-up": (f) => describe(f, 1)
             }
@@ -776,7 +974,7 @@
       });
       return html`<div>${swatchLegend([
         ...GROUPS.map((group, i) => [group, GROUP_COLORS[i]]),
-        ...(publicView ? [[`Hidden (fewer than ${MIN_CELL} labs)`, HATCH_CSS]] : []),
+        ...(publicView ? [[`Hidden (fewer than ${MIN_CELL} operations)`, HATCH_CSS]] : []),
         ["No responses yet", BLANK]
       ])}${plot}</div>`;
     }
@@ -788,11 +986,11 @@
       const cols = W >= 720 ? 3 : W >= 440 ? 2 : 1;
       const gap = 18;
       const w = Math.floor((W - (cols - 1) * gap) / cols);
-      const color = {type: "linear", domain: [0, 1], interpolate: d3.interpolateRgbBasis(SHARE_RAMP), tickFormat: "%", label: "Share of responding labs in the country"};
+      const color = {type: "linear", domain: [0, 1], interpolate: d3.interpolateRgbBasis(SHARE_RAMP), tickFormat: "%", label: "Share of responding operations in the country"};
       const maps = MULTIPLE_VENDORS.map((vendor) => {
         const id = hatchId();
         const count = (f) => stats.get(f.id).counts.find(([k]) => k === vendor)?.[1] ?? 0;
-        // Hide a country when it has too few labs overall, or too few on this vendor.
+        // Hide a country when it has too few operations overall, or too few on this vendor.
         const hidden = (f) => suppressed(stats.get(f.id).n) || (count(f) > 0 && suppressed(count(f)));
         return html`<div>
           <div style="font: 600 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; color: ${INK};">${vendor}</div>
@@ -807,12 +1005,12 @@
               Plot.geo(covered.filter((f) => !hidden(f)), Plot.centroid({
                 fill: (f) => stats.get(f.id).share(vendor),
                 tip: {format: {x: false, y: false, fill: false}},
-                channels: {Country: (f) => f.properties.name, [`On ${vendor}`]: (f) => pct(stats.get(f.id).share(vendor), 1), "Labs responding": (f) => stats.get(f.id).n}
+                channels: {Country: (f) => f.properties.name, [`On ${vendor}`]: (f) => pct(stats.get(f.id).share(vendor), 1), "Operations responding": (f) => stats.get(f.id).n}
               })),
               Plot.geo(covered.filter((f) => hidden(f)), Plot.centroid({
                 fill: `url(#${id})`,
                 tip: {format: {x: false, y: false}},
-                channels: {Country: (f) => f.properties.name, Status: () => `Hidden: fewer than ${MIN_CELL} labs`}
+                channels: {Country: (f) => f.properties.name, Status: () => `Hidden: fewer than ${MIN_CELL} operations`}
               })),
               Plot.geo(borders, {stroke: "white", strokeWidth: 0.4})
             ]
@@ -820,7 +1018,7 @@
         </div>`;
       });
       return html`<div>
-        <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 24px;">${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}${publicView ? swatchLegend([[`Hidden (fewer than ${MIN_CELL} labs)`, HATCH_CSS]]) : ""}</div>
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 24px;">${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}${publicView ? swatchLegend([[`Hidden (fewer than ${MIN_CELL} operations)`, HATCH_CSS]]) : ""}</div>
         <div style="display: grid; grid-template-columns: repeat(${cols}, ${w}px); gap: 10px ${gap}px; margin-top: 6px;">${maps}</div>
       </div>`;
     }
@@ -862,10 +1060,10 @@
       if (!movers.length) return emptyNote();
       const flows = d3.rollups(movers, (v) => v.length, (d) => d.lis[disc], (d) => d.newVendor ?? UNDECIDED);
       const allLinks = flows.flatMap(([from, tos]) => tos.map(([to, value]) => ({source: `from:${from}`, target: `to:${to}`, value})));
-      // Small-cell suppression: leave out moves made by fewer than MIN_CELL labs in the public view.
+      // Small-cell suppression: leave out moves made by fewer than MIN_CELL operations in the public view.
       const links = allLinks.filter((l) => !suppressed(l.value));
       const hiddenLabs = d3.sum(allLinks, (l) => (suppressed(l.value) ? l.value : 0));
-      if (!links.length) return html`<p class="empty-note">Every move in this view involves fewer than ${MIN_CELL} labs, so none are shown.</p>`;
+      if (!links.length) return html`<p class="empty-note">Every move in this view involves fewer than ${MIN_CELL} operations, so none are shown.</p>`;
       const ids = [...new Set(links.flatMap((l) => [l.source, l.target]))];
       const nodes = ids.map((id) => ({id, name: id.slice(id.indexOf(":") + 1), side: id.startsWith("from:") ? "from" : "to"}));
       const tallest = Math.max(...["from", "to"].map((side) => nodes.filter((n) => n.side === side).length));
@@ -893,7 +1091,7 @@
         .attr("stroke-width", (d) => Math.max(1.5, d.width))
         .on("pointermove", function (event, d) {
           link.attr("stroke-opacity", (l) => (l === d ? 0.85 : 0.18));
-          tip.show(event, `${d.source.name} → ${d.target.name}`, [[`${d.value}`, d.value === 1 ? "lab" : "labs", vendorColor(d.target.name)], [pct(d.value, d.source.value), `of labs leaving ${d.source.name}`]]);
+          tip.show(event, `${d.source.name} → ${d.target.name}`, [[`${d.value}`, d.value === 1 ? "operation" : "operations", vendorColor(d.target.name)], [pct(d.value, d.source.value), `of operations leaving ${d.source.name}`]]);
         })
         .on("pointerleave", () => {
           link.attr("stroke-opacity", 0.45);
@@ -924,20 +1122,43 @@
         .data([["RUNS TODAY", marginL, "start"], ["MOVING TO", w - marginR, "end"]]).join("text")
         .attr("x", (d) => d[1]).attr("y", 12).attr("text-anchor", (d) => d[2]).text((d) => d[0]);
       wrap.append(svg.node());
-      if (hiddenLabs) wrap.append(html`<p class="viz-note">${hiddenLabs} more labs are in moves made by fewer than ${MIN_CELL} labs each, which the public view leaves out.</p>`);
+      if (hiddenLabs) wrap.append(html`<p class="viz-note">${hiddenLabs} more operations are in moves made by fewer than ${MIN_CELL} operations each, which the public view leaves out.</p>`);
       return wrap;
     }
   </script>
   <script type="module">
-    // Bars sorted by count, or in the given order for ordered answers.
+    // Complementary suppression for the public view. Each line is a list of cells {n, hidden} whose total a reader
+    // knows, such as a row or a column. Hiding only the cells under MIN_CELL would let a reader recover one by
+    // subtraction, so in every line more cells are hidden, smallest first, until the hidden ones add up to nothing or
+    // to at least MIN_CELL. Cells shared between a row and a column are the same objects, so both lines see the change.
+    function protectLines(lines) {
+      const fix = (line) => {
+        const hiddenSum = d3.sum(line, (c) => (c.hidden ? c.n : 0));
+        if (!hiddenSum || hiddenSum >= MIN_CELL) return false;
+        const next = d3.least(line.filter((c) => !c.hidden && c.n), (c) => c.n);
+        if (next) next.hidden = true;
+        return Boolean(next);
+      };
+      for (let changed = true; changed; ) {
+        changed = false;
+        for (const line of lines) changed = fix(line) || changed;
+      }
+    }
+
+    // Bars sorted by count, or in the given order for ordered answers. A list-valued field (several answers) counts
+    // each answer, as a share of the operations that gave at least one.
     function breakdownChart(rows, key, title, order) {
-      const movers = rows.filter((d) => d[key]);
+      const movers = rows.filter((d) => (Array.isArray(d[key]) ? d[key].length : d[key]));
       if (!movers.length) return emptyNote();
-      const data = d3.rollups(movers, (v) => v.length, (d) => d[key])
-        .map(([label, n]) => ({label, n, hidden: suppressed(n)}))
-        .sort(order
-          ? (a, b) => order.indexOf(a.label) - order.indexOf(b.label)
-          : (a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.label, b.label));
+      const several = movers.some((d) => Array.isArray(d[key]));
+      const answers = movers.flatMap((d) => (several ? d[key] : [d[key]]));
+      const data = d3.rollups(answers, (v) => v.length, (v) => v)
+        .map(([label, n]) => ({label, n, small: suppressed(n), hidden: suppressed(n)}));
+      // With one answer per operation the bars add up to a known total, so one hidden bar could be worked out.
+      if (publicView && !several) protectLines([data]);
+      data.sort(order
+        ? (a, b) => order.indexOf(a.label) - order.indexOf(b.label)
+        : (a, b) => d3.descending(a.hidden ? 0 : a.n, b.hidden ? 0 : b.n) || d3.ascending(a.label, b.label));
       const narrow = W < 560;
       return Plot.plot({
         width: Math.min(W, 640),
@@ -952,48 +1173,175 @@
         marks: [
           narrow ? Plot.text(data, {x: 0, y: "label", text: "label", dy: -11, textAnchor: "start", fill: INK2}) : null,
           Plot.barX(data.filter((d) => !d.hidden), {x: "n", y: "label", fill: GROUP_COLORS[0], insetTop: narrow ? 20 : 4, insetBottom: 4, rx2: 4, tip: {format: {y: false}}, channels: {[title]: "label"}}),
-          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "label", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${d.n} · ${pct(d.n, movers.length)}`), dx: 6, dy: narrow ? 8 : 0, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.n), y: "label", text: (d) => (d.small ? `fewer than ${MIN_CELL}` : d.hidden ? "hidden" : `${d.n} · ${pct(d.n, movers.length)}`), dx: 6, dy: narrow ? 8 : 0, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
           Plot.ruleX([0], {stroke: AXIS})
         ]
       });
     }
 
-    // Consolidation versus everything else: how often the lab wasn't part of the decision.
+    // Consolidation versus everything else: how often pathology wasn't part of the decision.
     function decisionNote(rows) {
       const movers = rows.filter((d) => d.decider);
-      const share = (v) => ({n: v.length, outside: v.filter((d) => !LAB_AT_TABLE.includes(d.decider)).length});
+      const share = (v) => ({n: v.length, outside: v.filter((d) => !PATHOLOGY_AT_TABLE.includes(d.decider)).length});
       const consolidation = share(movers.filter((d) => CONSOLIDATION_REASONS.includes(d.reason)));
       const rest = share(movers.filter((d) => !CONSOLIDATION_REASONS.includes(d.reason)));
       if (consolidation.n < MIN_CELL || rest.n < MIN_CELL) return "";
-      return html`<p class="viz-note">When consolidation (EHR or merger) drove the move, ${pct(consolidation.outside, consolidation.n)} of decisions were made without lab leadership at the table. For every other reason, ${pct(rest.outside, rest.n)} were. <b>Illustrative pattern, not a finding:</b> the synthetic data was built to show this.</p>`;
+      return html`<p class="viz-note">When consolidation (EHR or merger) drove the move, ${pct(consolidation.outside, consolidation.n)} of decisions were made without pathology leadership at the table. For every other reason, ${pct(rest.outside, rest.n)} were. <b>Illustrative pattern, not a finding:</b> the synthetic data was built to show this.</p>`;
     }
 
-    function digitalByTeamChart(rows) {
-      const data = INFORMATICS_TEAMS.map((team) => {
-        const labs = rows.filter((d) => d.informatics === team);
-        const n = labs.filter((d) => DIGITAL_FIRST.includes(d.direction)).length;
-        return {team, total: labs.length, n, share: labs.length ? n / labs.length : 0, hidden: suppressed(labs.length) || suppressed(n)};
+    // The share of operations meeting `test` in each informatics staffing band. The public view gives shares only, since
+    // band sizes would reveal staffing, which is counted only in totals.
+    function teamChart(rows, test, what) {
+      const data = STAFF_BANDS.map((team) => {
+        const ops = rows.filter((d) => d.staff === team);
+        const n = ops.filter(test).length;
+        return {team, total: ops.length, n, share: ops.length ? n / ops.length : 0, hidden: suppressed(ops.length) || suppressed(n) || suppressed(ops.length - n)};
       }).filter((d) => d.total);
       if (!data.length) return emptyNote();
-      const teamLabel = (t) => (t === "None" ? "No in-house team" : t === "More than 10" ? "More than 10 people" : t);
       const narrow = W < 560;
+      const label = (d) => (d.hidden ? "hidden (small group)" : publicView ? pct(d.n, d.total) : `${pct(d.n, d.total)} of ${d.total} operations`);
       return Plot.plot({
         width: Math.min(W, 640),
         height: data.length * (narrow ? 44 : 28) + 16,
-        marginLeft: narrow ? 0 : 230,
-        marginRight: 130,
+        marginLeft: narrow ? 0 : 130,
+        marginRight: 160,
         marginTop: 8,
         marginBottom: 8,
         style: PLOT_STYLE,
         x: {axis: null, domain: [0, d3.max(data, (d) => (d.hidden ? 0 : d.share)) || 1]},
-        y: {domain: data.map((d) => d.team), label: null, tickSize: 0, tickFormat: teamLabel, axis: narrow ? null : "left"},
+        y: {domain: data.map((d) => d.team), label: null, tickSize: 0, axis: narrow ? null : "left"},
         marks: [
-          narrow ? Plot.text(data, {x: 0, y: "team", text: (d) => teamLabel(d.team), dy: -11, textAnchor: "start", fill: INK2}) : null,
-          Plot.barX(data.filter((d) => !d.hidden), {x: "share", y: "team", fill: GROUP_COLORS[0], insetTop: narrow ? 20 : 4, insetBottom: 4, rx2: 4, tip: {format: {x: false, y: false}}, channels: {"Informatics team": (d) => teamLabel(d.team), "Digital-first": (d) => `${d.n} of ${d.total} labs`}}),
-          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.share), y: "team", text: (d) => (d.hidden ? `fewer than ${MIN_CELL}` : `${pct(d.n, d.total)} of ${d.total} labs`), dx: 6, dy: narrow ? 8 : 0, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
+          narrow ? Plot.text(data, {x: 0, y: "team", text: "team", dy: -11, textAnchor: "start", fill: INK2}) : null,
+          Plot.barX(data.filter((d) => !d.hidden), {x: "share", y: "team", fill: GROUP_COLORS[0], insetTop: narrow ? 20 : 4, insetBottom: 4, rx2: 4, tip: {format: {x: false, y: false}}, channels: {"Informatics staff": "team", [what]: label}}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.share), y: "team", text: label, dx: 6, dy: narrow ? 8 : 0, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
           Plot.ruleX([0], {stroke: AXIS})
         ]
       });
+    }
+
+    // Where each type of operation stands with digital pathology. In the public view, small stage counts are pooled into
+    // one hatched segment per bar, with complementary suppression across both the bars (types) and the stages, so no
+    // count under MIN_CELL can be read off a bar or worked out from the "All operations" bar or the other types.
+    function dpStatusChart(rows) {
+      if (!rows.length) return emptyNote();
+      const cellsFor = (group, list) => DP_STATUSES.map((status) => {
+        const n = list.filter((d) => d.dp === status).length;
+        return {group, status, n, total: list.length, hidden: suppressed(n) || suppressed(list.length)};
+      });
+      const typeRows = TYPES.map((t) => cellsFor(t, rows.filter((d) => d.type === t))).filter((row) => row[0].total);
+      const allRow = cellsFor("All operations", rows);
+      // The page also prints how many operations sign out digitally and how many are primary digital, so the two
+      // clinical stages form a line of their own in every bar.
+      const clinical = (row) => row.filter((c) => DP_CLINICAL.includes(c.status));
+      if (publicView) {
+        protectLines([...typeRows, ...typeRows.map(clinical), ...DP_STATUSES.map((_, j) => typeRows.map((row) => row[j]))]);
+        protectLines([allRow, clinical(allRow)]);
+      }
+      const shownTypes = typeRows.filter((row) => !suppressed(row[0].total));
+      const shown = typeRows.length > 1 && !suppressed(rows.length) ? [allRow, ...shownTypes] : shownTypes;
+      if (!shown.length) return html`<p class="empty-note">Fewer than ${MIN_CELL} operations of each type match these filters, so stages aren't shown.</p>`;
+      const pooled = `Pooled to hide stages under ${MIN_CELL} operations`;
+      // The pooled segment sits where its lowest stage would, so it never reads as the most digital part of a bar.
+      const data = shown.flatMap((row) => {
+        const first = row.findIndex((c) => c.hidden && c.n);
+        const hiddenN = d3.sum(row, (c) => (c.hidden ? c.n : 0));
+        const segments = row.flatMap((c, i) => [
+          ...(i === first ? [{group: c.group, status: pooled, n: hiddenN, total: c.total}] : []),
+          ...(c.n && !c.hidden ? [c] : [])
+        ]);
+        let x = 0;
+        return segments.map((d) => ({...d, x1: x, x2: (x += d.n / d.total)}));
+      });
+      const groups = shown.map((row) => row[0].group);
+      const narrow = W < 560;
+      const width = Math.min(W, 720);
+      const marginLeft = narrow ? 0 : 190;
+      const plotW = width - marginLeft - 10;
+      const id = hatchId();
+      const visible = data.filter((d) => d.status !== pooled);
+      const darkStage = (status) => DP_STATUSES.indexOf(status) >= 4;
+      const plot = Plot.plot({
+        width,
+        height: groups.length * (narrow ? 46 : 32) + 12,
+        marginLeft,
+        marginRight: 10,
+        marginTop: 4,
+        marginBottom: 8,
+        style: PLOT_STYLE,
+        x: {axis: null, domain: [0, 1]},
+        y: {domain: groups, label: null, tickSize: 0, axis: narrow ? null : "left"},
+        marks: [
+          hatchDefs(id),
+          narrow ? Plot.text(groups.map((group) => ({group})), {x: 0, y: "group", text: "group", dy: -12, textAnchor: "start", fill: INK2}) : null,
+          Plot.barX(visible, {x1: "x1", x2: "x2", y: "group", fill: (d) => DP_COLORS[DP_STATUSES.indexOf(d.status)], insetTop: narrow ? 22 : 5, insetBottom: 5, stroke: SURFACE, strokeWidth: 1,
+            tip: {format: {x1: false, x2: false, y: false, fill: false}}, channels: {Operations: "group", Stage: "status", Count: (d) => `${d.n} of ${d.total} (${pct(d.n, d.total)})`}}),
+          Plot.barX(data.filter((d) => d.status === pooled), {x1: "x1", x2: "x2", y: "group", fill: `url(#${id})`, insetTop: narrow ? 22 : 5, insetBottom: 5, stroke: SURFACE, strokeWidth: 1,
+            tip: {format: {x1: false, x2: false, y: false}}, channels: {Operations: "group", Stage: () => pooled}}),
+          Plot.text(visible.filter((d) => (d.x2 - d.x1) * plotW >= 34), {x: (d) => (d.x1 + d.x2) / 2, y: "group", text: (d) => pct(d.n, d.total), fill: (d) => (darkStage(d.status) ? SURFACE : INK), dy: narrow ? 9 : 0, fontSize: 11})
+        ]
+      });
+      const legend = swatchLegend([...DP_STATUSES.map((status, i) => [status, DP_COLORS[i]]), ...(data.some((d) => d.status === pooled) ? [[pooled, HATCH_CSS]] : [])]);
+      const left = typeRows.length - shownTypes.length;
+      return html`<div>${legend}${plot}${left ? html`<p class="viz-note">${left} operation ${left === 1 ? "type has" : "types have"} fewer than ${MIN_CELL} operations in this view and ${left === 1 ? "is" : "are"} left out.</p>` : ""}</div>`;
+    }
+
+    // The library of bespoke tools on offer: named operations that would share, or already do.
+    function toolsOnOffer(rows) {
+      const tools = rows
+        .filter((d) => SHARING.includes(d.share) && (!publicView || d.consent === "named"))
+        .flatMap((d) => d.tools.map((t) => ({
+          Tool: t.name,
+          "What it does": t.area,
+          Operation: d.name,
+          Country: d.country,
+          Support: d.support ?? "",
+          Sharing: d.share === "Already shared" ? "Already shared" : "Open to sharing"
+        })))
+        .sort((a, b) => BESPOKE_AREAS.indexOf(a["What it does"]) - BESPOKE_AREAS.indexOf(b["What it does"]) || d3.ascending(a.Tool, b.Tool));
+      if (!tools.length) return html`<p class="empty-note">No tools on offer match these filters yet.</p>`;
+      const operations = new Set(tools.map((t) => t.Operation)).size;
+      return html`<div><p class="viz-note">${tools.length} tools from ${operations} operations.</p>${Inputs.table(tools, {rows: 12, layout: "auto"})}</div>`;
+    }
+
+    // The share of operations that would be primary digital each year if every stated target held. The public view
+    // shows a year only when its running total and the step from the last year shown each cover none or at least
+    // MIN_CELL operations, so no small group of target years can be read off the line.
+    function dpTargetChart(rows) {
+      if (!rows.length) return emptyNote();
+      const tooFew = html`<p class="empty-note">Too few operations match these filters to show the projection.</p>`;
+      if (suppressed(rows.length)) return tooFew;
+      const years = d3.range(2026, 2032);
+      let data = years.map((year) => ({year, n: rows.filter((d) => d.dp === "Primary digital" || (+d.dpTarget && +d.dpTarget <= year)).length}));
+      if (publicView) {
+        const kept = [];
+        for (const d of data) if (!suppressed(d.n) && !suppressed(d.n - (kept.at(-1)?.n ?? 0))) kept.push(d);
+        while (kept.length && suppressed(rows.length - kept.at(-1).n)) kept.pop();
+        data = kept;
+      }
+      if (!data.length) return tooFew;
+      const label = (d) => pct(d.n, rows.length);
+      const yearLabel = (y) => (y === 2026 ? "Today" : String(y));
+      const narrow = W < 560;
+      const plot = Plot.plot({
+        width: Math.min(W, 640),
+        height: 220,
+        marginLeft: 40,
+        marginRight: 24,
+        marginTop: 22,
+        marginBottom: 30,
+        style: PLOT_STYLE,
+        x: {domain: [2026, 2031], label: null, ticks: narrow ? [2026, 2028, 2030] : years, tickFormat: yearLabel},
+        y: {domain: [0, Math.min(1, Math.max(0.1, (d3.max(data, (d) => d.n) / rows.length) * 1.2))], grid: true, tickFormat: "%", label: null},
+        marks: [
+          Plot.ruleY([0], {stroke: AXIS}),
+          Plot.lineY(data, {x: "year", y: (d) => d.n / rows.length, stroke: GROUP_COLORS[0], strokeWidth: 2, strokeDasharray: "5,4"}),
+          Plot.dot(data, {x: "year", y: (d) => d.n / rows.length, fill: (d) => (d.year === 2026 ? GROUP_COLORS[0] : SURFACE), stroke: GROUP_COLORS[0], strokeWidth: 2, r: 4,
+            tip: {format: {x: false, y: false, fill: false}}, channels: {Year: (d) => yearLabel(d.year), "Primary digital": label}}),
+          Plot.text(data, {x: "year", y: (d) => d.n / rows.length, text: label, dy: -12, fill: INK2, fontSize: 11})
+        ]
+      });
+      const merged = data.length < years.length;
+      return html`<div>${plot}${merged ? html`<p class="viz-note">Years with fewer than ${MIN_CELL} operations reaching their target are merged into the next year shown.</p>` : ""}</div>`;
     }
   </script>
   <script type="module">
@@ -1019,7 +1367,7 @@
           Plot.dot(live, Plot.stackY2({
             x: "x", fill: "group", order: GROUPS, r: 4.5, stroke: SURFACE, strokeWidth: 1,
             tip: {format: {x: false, y: false, fill: false}},
-            channels: {Lab: "lab", Where: "place", From: "from", To: "newVendor", "Go-live": "quarter", Status: "status"}
+            channels: {Operation: "lab", Where: "place", From: "from", To: "newVendor", "Go-live": "quarter", Status: "status"}
           }))
         ]
       });
@@ -1028,7 +1376,7 @@
   <script type="module">
     function shareOverTime(rows, disc) {
       if (!rows.length) return emptyNote();
-      if (suppressed(rows.length)) return html`<p class="empty-note">Fewer than ${MIN_CELL} labs match these filters, so shares aren't shown.</p>`;
+      if (suppressed(rows.length)) return html`<p class="empty-note">Fewer than ${MIN_CELL} operations match these filters, so shares aren't shown.</p>`;
       const vendorAt = (d, date) => {
         if (d.goLive && d.goLive <= date) return d.newVendor;
         if (d.previous && date < d.previous.date) return d.previous.vendor;
@@ -1041,13 +1389,16 @@
       });
       const past = data.filter((d) => d.date <= TODAY);
       const future = data.filter((d) => d.date >= TODAY);
+      if (!d3.max(data, (d) => d.share)) return html`<p class="empty-note">None of the operations in this view run ${TRACKED.slice(0, -1).join(", ")} or ${TRACKED[TRACKED.length - 1]}, so there are no shares to chart.</p>`;
       const wide = dates.map((date) => ({date, rows: data.filter((d) => +d.date === +date).sort((a, b) => b.share - a.share)}));
-      const yMax = Math.min(1, d3.max(data, (d) => d.share) * 1.1);
+      const yMax = Math.min(1, Math.max(0.05, d3.max(data, (d) => d.share) * 1.1));
       const height = 340;
       // Nudge end labels apart so they never overlap.
       const ends = future.filter((d) => +d.date === +dates[dates.length - 1]).sort((a, b) => b.share - a.share);
       const minGap = (14 / (height - 50)) * yMax;
       ends.forEach((d, i) => (d.labelY = i ? Math.min(d.share, ends[i - 1].labelY - minGap) : d.share));
+      // If the stack runs below zero, push it back up from the bottom.
+      for (let i = ends.length - 1; i >= 0; i--) ends[i].labelY = Math.max(ends[i].labelY, i === ends.length - 1 ? 0 : ends[i + 1].labelY + minGap);
       return Plot.plot({
         width: W,
         height,
@@ -1055,7 +1406,7 @@
         marginTop: 24,
         style: PLOT_STYLE,
         x: {type: "utc", label: null, ticks: d3.utcYear.every(W < 560 ? 5 : 1), tickFormat: "%Y"},
-        y: {domain: [0, yMax], grid: true, tickFormat: "%", label: W < 560 ? null : "Share of responding labs", labelArrow: "none"},
+        y: {domain: [0, yMax], grid: true, tickFormat: "%", label: W < 560 ? null : "Share of responding operations", labelArrow: "none"},
         color: {domain: TRACKED, range: GROUP_COLORS.slice(0, 3), legend: true},
         marks: [
           Plot.ruleX([TODAY], {stroke: MUTED, strokeDasharray: "2,3"}),
@@ -1150,13 +1501,13 @@
         node.attr("opacity", (m) => (onChain.has(m.id) ? 1 : 0.12));
         link.attr("stroke-opacity", (l) => (onChain.has(l.target.id) && onChain.has(l.source.id) ? 1 : 0.08)).attr("stroke", (l) => (onChain.has(l.target.id) && onChain.has(l.source.id) ? INK : AXIS));
         if (!n.d) return tip.show(event, "The Association", [[`${board.length}`, "board members seeded the survey"]]);
-        // The referral chain from the board down to this lab, shortened in the middle when long.
+        // The referral chain from the board down to this operation, shortened in the middle when long.
         const stepLabel = (d) => `${labelOf(d)}${!publicView || d.consent === "named" ? `, ${d.country}` : ""}${d.board ? " (board)" : ""}`;
         const steps = chain.slice().reverse().filter((c) => c.d).map((c, i) => [`${i}`, stepLabel(c.d)]);
-        const shown = steps.length > 6 ? [...steps.slice(0, 2), ["…", `${steps.length - 4} more labs`], ...steps.slice(-2)] : steps;
+        const shown = steps.length > 6 ? [...steps.slice(0, 2), ["…", `${steps.length - 4} more operations`], ...steps.slice(-2)] : steps;
         tip.show(event, labelOf(n.d), [
           [`${n.d.degree}`, n.d.degree === 1 ? "hop from the board" : "hops from the board", fillOf(n)],
-          [`${n.children}`, n.children === 1 ? "lab referred" : "labs referred"],
+          [`${n.children}`, n.children === 1 ? "operation referred" : "operations referred"],
           ...(steps.length > 1 ? [["", "Referral chain:"], ...shown.slice(0, -1)] : [])
         ]);
       });
@@ -1182,7 +1533,7 @@
         x: {domain: data.map((d) => d.k), label: "Hops from the board", labelAnchor: "center", labelArrow: "none", tickSize: 0, tickFormat: (k) => (k === 0 ? "Board" : k)},
         y: {axis: null},
         marks: [
-          Plot.barY(data, {x: "k", y: "n", fill: (d) => DEGREE_COLORS[degreeBin(d.k)], insetLeft: 1, insetRight: 1, ry2: 3, tip: {format: {fill: false}}, channels: {Labs: "n"}}),
+          Plot.barY(data, {x: "k", y: "n", fill: (d) => DEGREE_COLORS[degreeBin(d.k)], insetLeft: 1, insetRight: 1, ry2: 3, tip: {format: {fill: false}}, channels: {Operations: "n"}}),
           Plot.text(data, {x: "k", y: "n", text: (d) => d.n, dy: -8, fill: INK2}),
           Plot.ruleY([0], {stroke: AXIS})
         ]
@@ -1244,7 +1595,7 @@
         while (i < sorted.length && sorted[i].submitted < end) seen.add(sorted[i++].countryId);
         return {date: day, value: metric === "responses" ? i : seen.size};
       });
-      const label = metric === "responses" ? "Labs responding" : "Countries covered";
+      const label = metric === "responses" ? "Operations responding" : "Countries covered";
       const yMax = d3.max(data, (d) => d.value) * 1.12 || 1;
       return html`<div><b>${label}</b>${Plot.plot({
         width: Math.min(W / 2 - 20, 540) < 300 ? Math.min(W, 540) : Math.min(W / 2 - 20, 540),
@@ -1265,39 +1616,184 @@
     }
   </script>
   <script type="module">
+    const usCoverage = usHospitalCoverage(filtered);
+  </script>
+  <script type="module">
+    // Hospitals signed out for by responding US operations, in the order they answered. A state's coverage is capped at
+    // its real hospital count of each type, since two operations can sign out for the same hospital.
+    function usHospitalCoverage(rows) {
+      const ops = rows.filter((d) => d.usState && d.hospitals).sort((a, b) => a.submitted - b.submitted);
+      const states = new Map(Object.entries(US_STATES).map(([abbr, [fips, name, ...total]]) => [abbr, {abbr, fips, name, total, covered: [0, 0, 0], ops: 0}]));
+      const typeOps = US_HOSPITAL_TYPES.map(() => 0);
+      const timeline = [];
+      let covered = 0, bigOps = 0, bigHospitals = 0;
+      for (const d of ops) {
+        const st = states.get(d.usState);
+        st.ops += 1;
+        let added = 0;
+        d.hospitals.forEach((n, i) => {
+          const take = Math.min(n, st.total[i] - st.covered[i]);
+          st.covered[i] += take;
+          added += take;
+          if (n) typeOps[i] += 1;
+        });
+        covered += added;
+        if (d3.sum(d.hospitals) >= 6) (bigOps += 1), (bigHospitals += added);
+        timeline.push({date: d.submitted, ops: timeline.length + 1, covered});
+      }
+      const all = [...states.values()];
+      return {
+        ops, states, timeline, covered, typeOps,
+        total: d3.sum(all, (st) => d3.sum(st.total)),
+        coveredByType: [0, 1, 2].map((i) => d3.sum(all, (st) => st.covered[i])),
+        totalByType: [0, 1, 2].map((i) => d3.sum(all, (st) => st.total[i])),
+        big: {ops: bigOps, hospitals: bigHospitals}
+      };
+    }
+
+    function usCoverageMap(cov) {
+      const stateOf = (f) => cov.states.get(STATE_BY_FIPS.get(f.id));
+      const share = (st) => d3.sum(st.covered) / d3.sum(st.total);
+      const hidden = (st) => suppressed(st.ops);
+      const shown = usStateFeatures.filter((f) => stateOf(f).ops && !hidden(stateOf(f)));
+      const color = {type: "linear", domain: [0, d3.max(shown, (f) => share(stateOf(f))) || 0.1], interpolate: d3.interpolateRgbBasis(SHARE_RAMP), tickFormat: "%", label: "Share of the state's hospitals covered"};
+      const id = hatchId();
+      const name = (f) => stateOf(f).name;
+      const hospitals = (f) => d3.format(",")(d3.sum(stateOf(f).total));
+      const plot = Plot.plot({
+        width: Math.min(W, 900),
+        style: PLOT_STYLE,
+        projection: "albers-usa",
+        color,
+        marks: [
+          hatchDefs(id),
+          Plot.geo(usStateFeatures.filter((f) => !stateOf(f).ops), Plot.centroid({fill: BLANK, tip: {format: {x: false, y: false}},
+            channels: {State: name, Hospitals: hospitals, Status: () => "No responses yet"}})),
+          Plot.geo(usStateFeatures.filter((f) => stateOf(f).ops && hidden(stateOf(f))), Plot.centroid({fill: `url(#${id})`, tip: {format: {x: false, y: false}},
+            channels: {State: name, Hospitals: hospitals, Status: () => `Hidden: fewer than ${MIN_CELL} operations responding`}})),
+          Plot.geo(shown, Plot.centroid({fill: (f) => share(stateOf(f)), tip: {format: {x: false, y: false, fill: false}},
+            channels: {
+              State: name,
+              "Hospitals covered": (f) => `${d3.sum(stateOf(f).covered)} of ${hospitals(f)} (${pct(d3.sum(stateOf(f).covered), d3.sum(stateOf(f).total))})`,
+              "Operations responding": (f) => stateOf(f).ops
+            }})),
+          Plot.geo(usStateBorders, {stroke: "white", strokeWidth: 0.6})
+        ]
+      });
+      return html`<div>
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 24px;">${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}${swatchLegend([...(publicView ? [[`Hidden (fewer than ${MIN_CELL} operations)`, HATCH_CSS]] : []), ["No responses yet", BLANK]])}</div>
+        ${plot}
+      </div>`;
+    }
+
+    // Share of each hospital type covered. A type's figure is hidden when fewer than MIN_CELL operations contribute to it.
+    function usCoverageByType(cov) {
+      const data = US_HOSPITAL_TYPES.map((type, i) => ({type, covered: cov.coveredByType[i], total: cov.totalByType[i], hidden: suppressed(cov.typeOps[i])}))
+        .map((d) => ({...d, share: d.covered / d.total}));
+      const narrow = W < 560;
+      const label = (d) => (d.hidden ? `fewer than ${MIN_CELL} operations` : `${pct(d.covered, d.total)} · ${d3.format(",")(d.covered)} of ${d3.format(",")(d.total)}`);
+      return Plot.plot({
+        width: Math.min(W, 520),
+        height: data.length * (narrow ? 44 : 28) + 16,
+        marginLeft: narrow ? 0 : 110,
+        marginRight: 150,
+        marginTop: 8,
+        marginBottom: 8,
+        style: PLOT_STYLE,
+        x: {axis: null, domain: [0, d3.max(data, (d) => (d.hidden ? 0 : d.share)) || 1]},
+        y: {domain: US_HOSPITAL_TYPES, label: null, tickSize: 0, axis: narrow ? null : "left"},
+        marks: [
+          narrow ? Plot.text(data, {x: 0, y: "type", text: "type", dy: -11, textAnchor: "start", fill: INK2}) : null,
+          Plot.barX(data.filter((d) => !d.hidden), {x: "share", y: "type", fill: GROUP_COLORS[0], insetTop: narrow ? 20 : 4, insetBottom: 4, rx2: 4, tip: {format: {x: false, y: false}}, channels: {"Hospital type": "type", Covered: label}}),
+          Plot.text(data, {x: (d) => (d.hidden ? 0 : d.share), y: "type", text: label, dx: 6, dy: narrow ? 8 : 0, textAnchor: "start", fill: (d) => (d.hidden ? MUTED : INK2)}),
+          Plot.ruleX([0], {stroke: AXIS})
+        ]
+      });
+    }
+
+    // Hospitals covered at the end of each week. In the public view a week is merged into the next until at least
+    // MIN_CELL operations have answered since the last point, so no single operation's hospitals can be read off a step.
+    function usCoverageTimeline(cov) {
+      const weeks = d3.utcWeek.range(utc(2026, 8, 9), utc(2026, 10, 12));
+      const at = (end) => cov.timeline.filter((t) => t.date < end).at(-1) ?? {ops: 0, covered: 0};
+      let data = [{date: utc(2026, 8, 3), ops: 0, covered: 0}, ...weeks.map((end) => ({date: end > TODAY ? TODAY : end, ...at(end)}))];
+      data = data.filter((d, i) => i === 0 || d.ops !== data[i - 1].ops);
+      if (publicView) {
+        const kept = [data[0]];
+        for (const d of data.slice(1)) if (!suppressed(d.ops - kept.at(-1).ops)) kept.push(d);
+        data = kept;
+      }
+      const yMax = (d3.max(data, (d) => d.covered) || 1) * 1.15;
+      return Plot.plot({
+        width: Math.min(W / 2 - 20, 520) < 300 ? Math.min(W, 520) : Math.min(W / 2 - 20, 520),
+        height: 230,
+        marginTop: 26,
+        style: PLOT_STYLE,
+        x: {type: "utc", label: null, domain: [utc(2026, 8, 3), TODAY], ticks: d3.utcWeek.every(2), tickFormat: "%b %-d"},
+        y: {domain: [0, yMax], grid: true, label: null},
+        marks: [
+          Plot.rect(PHASES, {x1: "start", x2: (d) => (d.end > TODAY ? TODAY : d.end), fill: (d, i) => (i % 2 ? "#f4f3ef" : "#ecebe6"), fillOpacity: 0.8}),
+          Plot.text(PHASES, {x: (d) => new Date((+d.start + Math.min(+d.end, +TODAY)) / 2), frameAnchor: "top", dy: -16, text: "name", fill: INK2, fontWeight: 600}),
+          Plot.lineY(data, {x: "date", y: "covered", stroke: GROUP_COLORS[0], strokeWidth: 2, curve: "step-after"}),
+          Plot.dot(data, {x: "date", y: "covered", fill: SURFACE, stroke: GROUP_COLORS[0], strokeWidth: 2, r: 3.5,
+            tip: {format: {x: false, y: false}}, channels: {Date: (d) => d3.utcFormat("%b %-d")(d.date), "Hospitals covered": "covered", "US operations responding": "ops"}})
+        ]
+      });
+    }
+  </script>
+  <script type="module">
     function surveyForm() {
       const usa = countryFeatures.find((f) => f.id === "840");
+      const CLINICAL_CHOICES = ["Yes", "No", "No clinical lab at our sites"];
       const inputs = {
-        institution: Inputs.text({label: "Institution name", placeholder: "e.g., Larkmoor University Hospital", width: 320}),
+        institution: Inputs.text({label: "Name of your AP operation", placeholder: "e.g., Larkmoor University Department of Pathology", width: 320}),
         country: Inputs.select(countryFeatures, {label: "Country", format: (f) => f.properties.name, value: usa}),
-        type: Inputs.select(TYPES, {label: "Institution type"}),
-        informatics: Inputs.select(INFORMATICS_TEAMS, {label: "In-house informatics team", value: "3–10 people"}),
-        ap: Inputs.select(VENDORS, {label: "Anatomic pathology", value: "Cassandra Health"}),
-        cp: Inputs.select(VENDORS, {label: "Clinical pathology", value: "Magrathea Labs"}),
-        micro: Inputs.select(VENDORS, {label: "Microbiology", value: "Magrathea Labs"}),
-        bb: Inputs.select(VENDORS, {label: "Blood bank", value: "Magrathea Labs"}),
-        direction: Inputs.select(DIRECTIONS, {label: "Where is your lab headed?", value: "LIS plus digital pathology add-ons"}),
-        status: Inputs.radio(STATUSES, {label: "Switching status", value: "Implementing"}),
-        newVendor: Inputs.select(VENDORS, {label: "New vendor", value: "Sirius Cybernetics"}),
+        usState: Inputs.select(Object.keys(US_STATES).sort((a, b) => d3.ascending(US_STATES[a][1], US_STATES[b][1])), {label: "State", format: (k) => US_STATES[k][1], value: "CT"}),
+        type: Inputs.select(TYPES, {label: "Kind of operation"}),
+        sites: Inputs.select(SITES, {label: "Sites you sign out for", value: "2–5"}),
+        cases: Inputs.select(CASE_BANDS, {label: "Surgical cases a year", value: "15,000–40,000"}),
+        ap: Inputs.select(VENDORS, {label: "AP LIS", value: "Cassandra Health"}),
+        sameVendor: Inputs.radio(CLINICAL_CHOICES, {label: "Clinical lab on the same vendor?", value: "No"}),
+        status: Inputs.radio(STATUSES, {label: "Changing your AP LIS?", format: (k) => (k === "Stable" ? "Not planning to" : k), value: "Implementing"}),
+        newVendor: Inputs.select(VENDORS, {label: "New AP LIS", value: "Sirius Cybernetics"}),
         goLive: Inputs.select([2026, 2027, 2028, 2029, 2030], {label: "Go-live year", value: 2027, format: String}),
         announced: Inputs.radio(["yes", "no"], {label: "Are these plans public?", format: (k) => (k === "yes" ? "Yes: announced or under contract" : "Not yet: count them in totals only"), value: "yes"}),
         reason: Inputs.select(REASONS, {label: "Main reason"}),
         decider: Inputs.select(DECIDERS, {label: "Who decides"}),
+        dp: Inputs.select(DP_STATUSES, {label: "Where are you with digital pathology?", value: "Part of clinical sign-out"}),
+        scanned: Inputs.select(SCANNED_SHARES, {label: "Share of surgical cases scanned", value: "10–50%"}),
+        dpTarget: Inputs.select(DP_TARGETS, {label: "Target year for primary digital", value: "2028"}),
+        barrier: Inputs.select(BARRIERS, {label: "Main barrier"}),
+        bespoke: Inputs.radio(BESPOKE_STATUSES, {label: "Do you run bespoke tools alongside the AP LIS?", value: BESPOKE_STATUSES[0]}),
+        areas: Inputs.checkbox(BESPOKE_AREAS, {label: "What do they do?", value: ["Case assignment and workload"]}),
+        share: Inputs.radio(SHARE_CHOICES, {label: "Would you share any of them?", value: "Yes"}),
+        toolName: Inputs.text({label: "Name of one tool (optional)", placeholder: "e.g., Case Router", width: 320}),
+        support: Inputs.select(SUPPORT_LEVELS, {label: "How is it supported?"}),
+        staff: Inputs.select(STAFF_BANDS, {label: "Informatics and LIS staff supporting AP", value: "1–2 FTE"}),
         consent: Inputs.radio(CONSENT_LEVELS, {label: "How to show us", format: (k) => CONSENT_CHOICES[k], value: "named"})
       };
       const form = Inputs.form(inputs, {
         template: (i) => html`<div>
-          <div class="survey-step"><span class="step-n">1</span><div><h4>Your lab</h4>${i.institution}${i.country}${i.type}${i.informatics}</div></div>
-          <div class="survey-step"><span class="step-n">2</span><div><h4>Current LIS for each discipline</h4>${i.ap}${i.cp}${i.micro}${i.bb}</div></div>
-          <div class="survey-step"><span class="step-n">3</span><div><h4>Plans</h4>${i.direction}${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}${i.decider}</div></div>
-          <div class="survey-step"><span class="step-n">4</span><div><h4>Visibility</h4>${i.consent}</div></div>
+          <div class="survey-step"><span class="step-n">1</span><div><h4>Your AP operation</h4>${i.institution}${i.country}${i.usState}${i.type}${i.sites}${i.cases}${i.staff}</div></div>
+          <div class="survey-step"><span class="step-n">2</span><div><h4>AP LIS</h4>${i.ap}${i.sameVendor}${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}${i.decider}</div></div>
+          <div class="survey-step"><span class="step-n">3</span><div><h4>Digital pathology</h4>${i.dp}${i.scanned}${i.dpTarget}${i.barrier}</div></div>
+          <div class="survey-step"><span class="step-n">4</span><div><h4>Bespoke technology</h4>${i.bespoke}${i.areas}${i.share}${i.toolName}${i.support}</div></div>
+          <div class="survey-step"><span class="step-n">5</span><div><h4>Visibility</h4>${i.consent}</div></div>
         </div>`
       });
+      const show = (input, on) => (input.style.display = on ? "" : "none");
       const sync = () => {
         const s = inputs.status.value;
         const committed = s === "Selected" || s === "Implementing";
-        inputs.newVendor.style.display = inputs.goLive.style.display = inputs.announced.style.display = committed ? "" : "none";
-        inputs.reason.style.display = inputs.decider.style.display = s === "Stable" ? "none" : "";
+        for (const k of ["newVendor", "goLive", "announced"]) show(inputs[k], committed);
+        for (const k of ["reason", "decider"]) show(inputs[k], s !== "Stable");
+        const dp = inputs.dp.value;
+        show(inputs.scanned, DP_CLINICAL.includes(dp));
+        show(inputs.dpTarget, dp !== "Primary digital");
+        const builds = inputs.bespoke.value !== "No";
+        for (const k of ["areas", "share", "support"]) show(inputs[k], builds);
+        show(inputs.usState, inputs.country.value?.id === "840");
+        show(inputs.toolName, builds && SHARING.includes(inputs.share.value));
       };
       // Keep keystrokes in the form from re-running the charts; only Submit does that.
       form.addEventListener("input", (event) => {
@@ -1308,13 +1804,13 @@
 
       const message = html`<div aria-live="polite"></div>`;
       const button = html`<button class="survey-submit" type="button">Submit response</button>`;
-      const container = html`<div class="survey">${form}<div class="survey-actions">${button}<span class="survey-time">About 2 minutes. Demo only: nothing leaves this page.</span></div>${message}</div>`;
+      const container = html`<div class="survey">${form}<div class="survey-actions">${button}<span class="survey-time">Under 5 minutes. Demo only: nothing leaves this page.</span></div>${message}</div>`;
       container.value = [];
       button.onclick = () => {
         const v = form.value;
         const name = v.institution.trim();
         if (!name) {
-          message.replaceChildren(html`<p class="survey-error">Please enter your institution's name.</p>`);
+          message.replaceChildren(html`<p class="survey-error">Please enter the name of your AP operation.</p>`);
           return;
         }
         const f = v.country;
@@ -1325,6 +1821,19 @@
         const local = nearby((d) => d.countryId === f.id);
         const regional = nearby((d) => d.region === regionOf(f));
         const ref = d3.greatest(local.length ? local : regional.length ? regional : board, (d) => d.children);
+        const builds = v.bespoke !== "No";
+        if (builds && !v.areas.length) {
+          message.replaceChildren(html`<p class="survey-error">Please tick at least one thing your bespoke tools do.</p>`);
+          return;
+        }
+        const areas = builds ? v.areas : [];
+        const share = builds ? v.share : null;
+        const toolName = v.toolName.trim();
+        // In the live survey a US operation picks its hospitals from the CMS list; the demo estimates them from the site count.
+        const usState = f.id === "840" ? v.usState : null;
+        const siteCount = {"1": 1, "2–5": 3, "6–20": 12, "More than 20": 25}[v.sites];
+        const hospitalCount = v.type === "Dermatopathology practice" ? 0 : v.type === "Independent AP lab" ? Math.round(siteCount * 0.3) : siteCount;
+        const cah = v.type === "Contracted pathology group" ? Math.round(hospitalCount * 0.3) : 0;
         const record = {
           id: `NEW${container.value.length + 1}`,
           name,
@@ -1334,16 +1843,31 @@
           countryId: f.id,
           region: regionOf(f),
           type: v.type,
-          lis: {ap: v.ap, cp: v.cp, micro: v.micro, bb: v.bb},
+          lis: {ap: v.ap, cp: v.sameVendor === "Yes" ? v.ap : v.sameVendor === "No" ? "Another vendor" : null},
           status: v.status,
           newVendor: committed ? v.newVendor : null,
           goLive: committed ? utc(v.goLive, v.goLive === 2026 ? 10 : 4, 1) : null,
           reason: v.status === "Stable" ? null : v.reason,
           decider: v.status === "Stable" ? null : v.decider,
-          informatics: v.informatics,
-          direction: v.direction,
           previous: null,
           board: false,
+          staff: v.staff,
+          sites: v.sites,
+          cases: v.cases,
+          dp: v.dp,
+          scanned: DP_CLINICAL.includes(v.dp) ? v.scanned : null,
+          dpTarget: v.dp === "Primary digital" ? "Already there" : v.dpTarget,
+          barrier: v.barrier,
+          ims: null,
+          integration: null,
+          ai: [],
+          bespoke: v.bespoke,
+          bespokeAreas: areas,
+          share,
+          support: builds ? v.support : null,
+          tools: SHARING.includes(share) && toolName ? [{name: toolName, area: areas[0]}] : [],
+          usState,
+          hospitals: usState ? [hospitalCount - cah, cah, 0] : null,
           wave: "Ambassadors",
           submitted: TODAY,
           referrer: ref.id,
@@ -1356,20 +1880,22 @@
         const place = countryN >= MIN_CELL ? country : record.region;
         const appearAs = {
           named: `${name} will appear in the atlas by name`,
-          unnamed: `Your lab will appear as ${articleFor(v.type).toLowerCase()} ${v.type.toLowerCase()} in ${place}`,
-          aggregate: "Your lab will count toward the totals but won't be listed"
+          unnamed: `Your operation will appear as ${articleFor(v.type).toLowerCase()} ${lowerFirst(v.type)} in ${place}`,
+          aggregate: "Your operation will count toward the totals but won't be listed"
         }[v.consent];
-        const refLabel = ref.consent === "named" ? `${ref.name} (${ref.country})` : "a colleague's lab";
+        const refLabel = ref.consent === "named" ? `${ref.name} (${ref.country})` : "a colleague's operation";
         const plansNote = v.status === "Evaluating" ? " While you're evaluating, your plans count toward totals only." : committed && v.announced !== "yes" ? " Your plans count toward totals only until you tell us they're announced." : "";
+        const hospitalNote = usState && hospitalCount ? html`<span> The hospitals you sign out for in ${US_STATES[usState][1]} now count toward <a href="#atlas-hospitals">US hospital coverage</a>.</span>` : "";
+        const toolNote = record.tools.length ? (v.consent === "named" ? html`<span> ${toolName} is now in the <a href="#atlas-bespoke">tools on offer</a>.</span>` : " Your tool counts in the totals; it is listed by name only when your operation is.") : "";
         const code = Math.random().toString(36).slice(2, 7).toUpperCase();
         const link = `https://atlas.example.org/join?ref=${code}`;
         const copy = html`<button type="button">Copy</button>`;
         copy.onclick = () => navigator.clipboard?.writeText(link).then(() => (copy.textContent = "Copied"));
         message.replaceChildren(html`<div class="survey-thanks">
-          <p><b>Thank you!</b> ${appearAs}.${plansNote} Scroll up to see ${country} on the <a href="#atlas-coverage">coverage map</a> and your lab in the <a href="#atlas-network">referral network</a>.</p>
+          <p><b>Thank you!</b> ${appearAs}.${plansNote}${toolNote}${hospitalNote} Scroll up to see ${country} on the <a href="#atlas-coverage">coverage map</a> and your operation in the <a href="#atlas-network">referral network</a>.</p>
           <p>You arrived through a link from <b>${refLabel}</b>, so you are <b>${record.degree} ${record.degree === 1 ? "hop" : "hops"}</b> from the Association board.</p>
           <div class="survey-ref"><span>Your referral link</span><code>${link}</code>${copy}</div>
-          <p style="margin-bottom:6px">Forward it to a colleague at another institution. Every lab they bring in becomes part of your branch.</p>
+          <p style="margin-bottom:6px">Forward it to a colleague at another institution. Every operation they bring in becomes part of your branch.</p>
           <div class="survey-share"><button type="button" disabled title="Not wired up in the prototype">Email a colleague</button><button type="button" disabled title="Not wired up in the prototype">Share on LinkedIn</button></div>
         </div>`);
       };
