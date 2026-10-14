@@ -84,7 +84,7 @@
       ${kpi("Signing out digitally", pctOf(summary.dpClinical, summary.n), `${fmtPart(summary.primary, summary.dpClinical)} of them primary digital`)}
       ${kpi("Running bespoke tools", pctOf(summary.bespoke, summary.n), `${fmtCount(summary.offering)} operations offer to share theirs`)}
       ${kpi("Changing AP LIS", pctOf(summary.switching, summary.n), `${fmtCount(summary.switching)} evaluating, selected, or implementing`)}
-      ${kpi("US hospitals covered", usCoverage.ops.length && !suppressed(usCoverage.ops.length) ? pct(usCoverage.covered, usCoverage.total) : "—", usCoverage.ops.length && !suppressed(usCoverage.ops.length) ? `${d3.format(",")(usCoverage.covered)} of ${d3.format(",")(usCoverage.total)} hospitals` : "no US responses in this view")}
+      ${kpi("US hospitals covered", usCoverage.ops.length ? pct(usCoverage.covered, usCoverage.total) : "—", usCoverage.ops.length ? `${d3.format(",")(usCoverage.covered)} of ${d3.format(",")(usCoverage.total)} hospitals` : "none counted in this view yet")}
     </div>`
   </script>
   <script type="text/markdown">
@@ -235,12 +235,12 @@
 
     ## Hospitals covered in the US
 
-    In the US, the public CMS hospital list gives the atlas a denominator: ${d3.format(",")(usCoverage.total)} hospitals in the 50 states and DC. Each operation names the hospitals it signs out for, so one answer from a contracted group that serves 20 hospitals fills in all 20 at once. Responding operations cover **${usCoverage.ops.length && !suppressed(usCoverage.ops.length) ? `${d3.format(",")(usCoverage.covered)} hospitals (${pct(usCoverage.covered, usCoverage.total)})` : `a number too small to show`}**. ${usCoverage.big.ops >= MIN_CELL || (!publicView && usCoverage.big.ops) ? `The ${usCoverage.big.ops} operations that sign out for 6 or more hospitals are ${pct(usCoverage.big.ops, usCoverage.ops.length)} of US responses but cover ${pct(usCoverage.big.hospitals, usCoverage.covered)} of these hospitals.` : ""}
+    In the US, the public CMS hospital list gives the atlas a denominator: ${d3.format(",")(usCoverage.total)} hospitals in the 50 states and DC. Each operation names the hospitals it signs out for, so one answer from a contracted group that serves 20 hospitals fills in all 20 at once. Responding operations cover **${d3.format(",")(usCoverage.covered)} hospitals (${pct(usCoverage.covered, usCoverage.total)})**. ${usCoverage.big.ops >= MIN_CELL || (!publicView && usCoverage.big.ops) ? `The ${usCoverage.big.ops} operations that sign out for 6 or more hospitals are ${pct(usCoverage.big.ops, usCoverage.ops.length)} of the US operations counted but cover ${pct(usCoverage.big.hospitals, usCoverage.covered)} of these hospitals.` : ""}
 
-    Hospital totals per state are real; which hospitals are covered is synthetic. In the public view, a state is hatched until ${MIN_CELL} of its operations have responded.
+    Hospital totals per state are real; which hospitals are covered is synthetic. Hospitals are never hidden. Operations that agreed to be named count right away; those that asked not to be named count once ${MIN_CELL} of them in the same state have answered, so none can be picked out by the share it adds.
   </script>
   <script type="module">
-    usCoverage.ops.length
+    filtered.some((d) => d.usState)
       ? html`<div>${usCoverageMap(usCoverage)}
           <div class="row-2" style="margin-top: 1rem;">
             <div><b>Share covered, by hospital type</b>${usCoverageByType(usCoverage)}</div>
@@ -316,7 +316,7 @@
     - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} operations): counted in maps, charts, and totals, but never listed individually.
     - **Plans:** a listed operation's new vendor, go-live date, reason, and decision-maker appear only once it says they're announced or under contract. "Evaluating" is only ever counted in totals, and so are each operation's digital pathology target, main barrier, and informatics staffing.
     - **Bespoke tools:** a tool's name, and what it does, appear only when its operation is shown by name and offers to share it. For every other operation, what the tools do is counted only in totals.
-    - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} operations is hidden. Map areas and bar segments are hatched, and counts read "fewer than ${MIN_CELL}". On the US hospital map, a state stays hatched until ${MIN_CELL} of its operations respond. ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
+    - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} operations is hidden. Map areas and bar segments are hatched, and counts read "fewer than ${MIN_CELL}". On the US hospital map, operations that asked not to be named count toward their state only once ${MIN_CELL} of them there have answered. ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
 
     Switch **Show as** to *Staff view* at the top of the page to see the raw data these rules protect. In the live atlas, that view would sit behind a staff login.
   </script>
@@ -1621,8 +1621,14 @@
   <script type="module">
     // Hospitals signed out for by responding US operations, in the order they answered. A state's coverage is capped at
     // its real hospital count of each type, since two operations can sign out for the same hospital.
+    // Hospitals are never hidden; the rule protects respondents. In the public view, operations that agreed to be named
+    // count right away. Those that asked not to be named count once five of them in the same state have answered, so a
+    // state's coverage can't single one out (a group serving 20 hospitals may be the only one that size in its state).
     function usHospitalCoverage(rows) {
-      const ops = rows.filter((d) => d.usState && d.hospitals).sort((a, b) => a.submitted - b.submitted);
+      const responding = rows.filter((d) => d.usState && d.hospitals);
+      const unnamedIn = d3.rollup(responding.filter((d) => d.consent !== "named"), (v) => v.length, (d) => d.usState);
+      const ops = responding.filter((d) => !publicView || d.consent === "named" || unnamedIn.get(d.usState) >= MIN_CELL)
+        .sort((a, b) => a.submitted - b.submitted);
       const states = new Map(Object.entries(US_STATES).map(([abbr, [fips, name, ...total]]) => [abbr, {abbr, fips, name, total, covered: [0, 0, 0], ops: 0}]));
       const typeOps = US_HOSPITAL_TYPES.map(() => 0);
       const timeline = [];
@@ -1654,10 +1660,8 @@
     function usCoverageMap(cov) {
       const stateOf = (f) => cov.states.get(STATE_BY_FIPS.get(f.id));
       const share = (st) => d3.sum(st.covered) / d3.sum(st.total);
-      const hidden = (st) => suppressed(st.ops);
-      const shown = usStateFeatures.filter((f) => stateOf(f).ops && !hidden(stateOf(f)));
+      const shown = usStateFeatures.filter((f) => stateOf(f).ops);
       const color = {type: "linear", domain: [0, d3.max(shown, (f) => share(stateOf(f))) || 0.1], interpolate: d3.interpolateRgbBasis(SHARE_RAMP), tickFormat: "%", label: "Share of the state's hospitals covered"};
-      const id = hatchId();
       const name = (f) => stateOf(f).name;
       const hospitals = (f) => d3.format(",")(d3.sum(stateOf(f).total));
       const plot = Plot.plot({
@@ -1666,22 +1670,19 @@
         projection: "albers-usa",
         color,
         marks: [
-          hatchDefs(id),
           Plot.geo(usStateFeatures.filter((f) => !stateOf(f).ops), Plot.centroid({fill: BLANK, tip: {format: {x: false, y: false}},
-            channels: {State: name, Hospitals: hospitals, Status: () => "No responses yet"}})),
-          Plot.geo(usStateFeatures.filter((f) => stateOf(f).ops && hidden(stateOf(f))), Plot.centroid({fill: `url(#${id})`, tip: {format: {x: false, y: false}},
-            channels: {State: name, Hospitals: hospitals, Status: () => `Hidden: fewer than ${MIN_CELL} operations responding`}})),
+            channels: {State: name, Hospitals: hospitals, Status: () => "No hospitals covered yet"}})),
           Plot.geo(shown, Plot.centroid({fill: (f) => share(stateOf(f)), tip: {format: {x: false, y: false, fill: false}},
             channels: {
               State: name,
               "Hospitals covered": (f) => `${d3.sum(stateOf(f).covered)} of ${hospitals(f)} (${pct(d3.sum(stateOf(f).covered), d3.sum(stateOf(f).total))})`,
-              "Operations responding": (f) => stateOf(f).ops
+              "Operations counted": (f) => fmtCount(stateOf(f).ops)
             }})),
           Plot.geo(usStateBorders, {stroke: "white", strokeWidth: 0.6})
         ]
       });
       return html`<div>
-        <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 24px;">${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}${swatchLegend([...(publicView ? [[`Hidden (fewer than ${MIN_CELL} operations)`, HATCH_CSS]] : []), ["No responses yet", BLANK]])}</div>
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 24px;">${Plot.legend({color: {...color, width: 300}, style: PLOT_STYLE})}${swatchLegend([["No hospitals covered yet", BLANK]])}</div>
         ${plot}
       </div>`;
     }
