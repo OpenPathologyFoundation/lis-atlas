@@ -314,7 +314,7 @@
     - **Named** (${d3.format(",")(consentCounts.get("named") ?? 0)} operations): name shown with systems, announced plans, and any tools offered for sharing.
     - **Unnamed** (${d3.format(",")(consentCounts.get("unnamed") ?? 0)} operations): systems and plans shown as, say, "a dermatopathology practice in Germany". Where a country has fewer than ${MIN_CELL} responding operations, only the region is given.
     - **Totals only** (${d3.format(",")(consentCounts.get("aggregate") ?? 0)} operations): counted in maps, charts, and totals, but never listed individually.
-    - **Plans:** a listed operation's new vendor, go-live date, reason, and decision-maker appear only once it says they're announced or under contract. "Evaluating" is only ever counted in totals, and so are each operation's digital pathology target, main barrier, and informatics staffing.
+    - **Plans:** a listed operation's new vendor, go-live date, reason, and decision-maker appear only once it says they're announced or under contract. Past go-live dates count only in totals. "Evaluating" is only ever counted in totals, and so are each operation's digital pathology target, main barrier, and informatics staffing.
     - **Bespoke tools:** a tool's name, and what it does, appear only when its operation is shown by name and offers to share it. For every other operation, what the tools do is counted only in totals.
     - **Small-cell suppression:** any number based on fewer than ${MIN_CELL} operations is hidden. Map areas and bar segments are hatched, and counts read "fewer than ${MIN_CELL}". On the US hospital map, operations that asked not to be named count toward their state only once ${MIN_CELL} of them there have answered. ${publicView ? "On the vendor map, that currently hides " + hatchedCountries + " countries." : "The staff view switches this off."}
 
@@ -1755,6 +1755,8 @@
         cases: Inputs.select(CASE_BANDS, {label: "Surgical cases a year", value: "15,000–40,000"}),
         ap: Inputs.select(VENDORS, {label: "AP LIS", value: "Cassandra Health"}),
         sameVendor: Inputs.radio(CLINICAL_CHOICES, {label: "Clinical lab on the same vendor?", value: "No"}),
+        liveSince: Inputs.select(d3.range(2026, 1999, -1), {label: "Current AP LIS live since", value: 2019, format: String}),
+        replaced: Inputs.select(["First LIS", ...VENDORS], {label: "It replaced", value: "Magrathea Labs"}),
         status: Inputs.radio(STATUSES, {label: "Changing your AP LIS?", format: (k) => (k === "Stable" ? "Not planning to" : k), value: "Implementing"}),
         newVendor: Inputs.select(VENDORS, {label: "New AP LIS", value: "Sirius Cybernetics"}),
         goLive: Inputs.select([2026, 2027, 2028, 2029, 2030], {label: "Go-live year", value: 2027, format: String}),
@@ -1776,7 +1778,7 @@
       const form = Inputs.form(inputs, {
         template: (i) => html`<div>
           <div class="survey-step"><span class="step-n">1</span><div><h4>Your AP operation</h4>${i.institution}${i.country}${i.usState}${i.type}${i.sites}${i.cases}${i.staff}</div></div>
-          <div class="survey-step"><span class="step-n">2</span><div><h4>AP LIS</h4>${i.ap}${i.sameVendor}${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}${i.decider}</div></div>
+          <div class="survey-step"><span class="step-n">2</span><div><h4>AP LIS</h4>${i.ap}${i.sameVendor}${i.liveSince}${i.replaced}${i.status}${i.newVendor}${i.goLive}${i.announced}${i.reason}${i.decider}</div></div>
           <div class="survey-step"><span class="step-n">3</span><div><h4>Digital pathology</h4>${i.dp}${i.scanned}${i.dpTarget}${i.barrier}</div></div>
           <div class="survey-step"><span class="step-n">4</span><div><h4>Bespoke technology</h4>${i.bespoke}${i.areas}${i.share}${i.toolName}${i.support}</div></div>
           <div class="survey-step"><span class="step-n">5</span><div><h4>Visibility</h4>${i.consent}</div></div>
@@ -1850,7 +1852,8 @@
           goLive: committed ? utc(v.goLive, v.goLive === 2026 ? 10 : 4, 1) : null,
           reason: v.status === "Stable" ? null : v.reason,
           decider: v.status === "Stable" ? null : v.decider,
-          previous: null,
+          // The live survey asks for month and year; the demo takes the year and places the switch mid-year.
+          previous: v.replaced !== "First LIS" && v.replaced !== v.ap ? {vendor: v.replaced, date: utc(v.liveSince, 7, 1)} : null,
           board: false,
           staff: v.staff,
           sites: v.sites,
